@@ -27,3 +27,9 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
+
+import { AuthContextProvider } from "./contexts/AuthContext.js";
+ 
+export default function Layout({ children }) {
+  return <AuthContextProvider>{children}</AuthContextProvider>;
+}
