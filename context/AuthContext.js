@@ -8,7 +8,7 @@ import {
   signInWithPopup, 
   signOut 
 } from "firebase/auth";
-import { auth } from "../utils/firebase.js";  // Adjust the import path as necessary
+import { auth } from "../utils/firebase.js";
 
 // Create the context
 const AuthContext = createContext();
@@ -48,7 +48,7 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Custom hook to use auth easily
+
 export const useAuth = () => {
   return useContext(AuthContext);
 };

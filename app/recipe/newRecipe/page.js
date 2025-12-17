@@ -85,7 +85,7 @@ export default function NewRecipe() {
         throw firestoreError;
       }
 
-      // Helpful debug output: log the saved document id so you can confirm
+      // Helpful debug output: log the saved document id so I can confirm
       // the save succeeded in the browser console when testing.
       console.log("Saved recipe id:", docRef.id);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useAuth } from "@/context/AuthContext"; // Optional: if you want to check ownership later
+import { useAuth } from "@/context/AuthContext";
 import { db } from "../../../utils/firebase.js"; 
 import { doc, getDoc } from "firebase/firestore";
 import { useParams, useRouter } from "next/navigation";
