@@ -1,5 +1,6 @@
-import { PlaceholderScreen } from "@/components/PlaceholderScreen";
+import { Redirect } from "expo-router";
 
-export default function RecipesScreen() {
-  return <PlaceholderScreen title="Recipes" description="Your saved recipes will appear here." />;
+// The app opens on the Recipes tab.
+export default function Index() {
+  return <Redirect href="/recipes" />;
 }

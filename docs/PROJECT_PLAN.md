@@ -35,6 +35,7 @@ planning (no backlog ID yet).
 - [ ] N-01 Create, view, edit and delete recipes manually (each edit sets `updatedAt`)
 - [ ] #8 Adjust serving size; ingredient amounts scale to match
 - [ ] #5 Tag recipes by diet (e.g. keto)
+- [ ] Tag recipes by Breakfast, Lunch, Dinner (For the mealplanner to search from, recipes can be tagged under multiple)
 - [ ] #10 Sort/filter recipes by food restriction or allergy
 - [ ] N-02 Search stored recipes by name
 - [ ] N-03 Filter stored recipes by ingredients, diet, allergies, and high/low protein, fiber, etc.

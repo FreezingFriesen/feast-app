@@ -15,9 +15,10 @@ function tabIcon(name: IconName) {
 export default function TabLayout() {
   return (
     <Tabs>
+      <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen
-        name="index"
-        options={{ title: "Recipes", tabBarIcon: tabIcon("book-outline") }}
+        name="recipes"
+        options={{ title: "Recipes", headerShown: false, tabBarIcon: tabIcon("book-outline") }}
       />
       <Tabs.Screen
         name="meal-planner"
