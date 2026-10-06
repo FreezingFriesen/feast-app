@@ -28,7 +28,7 @@ export default function RecipesScreen() {
   // Render the list of recipes or a message indicating that there are no recipes yet.
   return (
     <>
-    // Add a header button to navigate to the "New Recipe" screen.
+    {/* Add a header button to navigate to the "New Recipe" screen. */}
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -40,6 +40,7 @@ export default function RecipesScreen() {
           ),
         }}
       />
+      {/* Render the list of recipes using a FlatList component. If there are no recipes, display a message and a button to create a new recipe. */}
       <FlatList
         data={recipes}
         keyExtractor={(recipe) => recipe.id}
