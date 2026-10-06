@@ -1,13 +1,15 @@
+import type { Recipe } from "@/repositories/RecipeRepository";
+import { useRecipeRepository } from "@/repositories/RepositoryProvider";
 import { Link, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import type { Recipe } from "@/repositories/RecipeRepository";
-import { useRecipeRepository } from "@/repositories/RepositoryProvider";
 
+// This screen displays a list of recipes and allows the user to navigate to the "New Recipe" screen.
 export default function RecipesScreen() {
   const repository = useRecipeRepository();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
 
+  // Load the list of recipes when the component mounts and subscribe to changes in the repository.
   useEffect(() => {
     let active = true;
     const load = () => {
@@ -23,8 +25,10 @@ export default function RecipesScreen() {
     };
   }, [repository]);
 
+  // Render the list of recipes or a message indicating that there are no recipes yet.
   return (
     <>
+    // Add a header button to navigate to the "New Recipe" screen.
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -36,6 +40,7 @@ export default function RecipesScreen() {
           ),
         }}
       />
+      // Render the list of recipes using a FlatList component. If there are no recipes, display a message and a button to create a new recipe.
       <FlatList
         data={recipes}
         keyExtractor={(recipe) => recipe.id}
@@ -51,6 +56,7 @@ export default function RecipesScreen() {
             </Link>
           </View>
         }
+        // Render each recipe item in the list with its title, number of servings, and number of ingredients.
         renderItem={({ item }) => (
           <View style={styles.item}>
             <Text style={styles.itemTitle}>{item.title}</Text>
@@ -64,6 +70,7 @@ export default function RecipesScreen() {
   );
 }
 
+// Define styles for the components in the RecipesScreen.
 const styles = StyleSheet.create({
   headerButton: {
     color: "#208AEF",

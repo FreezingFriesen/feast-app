@@ -1,14 +1,6 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+// This screen allows the user to create a new recipe by filling out a form with various fields 
+// such as title, description, ingredients, steps, and diet tags. 
+// The form is validated before submission, and any errors are displayed to the user.
 import { ChipSelect } from "@/components/form/ChipSelect";
 import { FieldError, FormField } from "@/components/form/FormField";
 import {
@@ -25,11 +17,25 @@ import {
 } from "@/features/recipes/recipeForm";
 import { useRecipeRepository } from "@/repositories/RepositoryProvider";
 import { DIET_TAGS, MEAL_TYPES, recipeSchema, UNITS } from "@/validation/recipeSchema";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
+// A utility function that toggles the presence of a value in a list.
 function toggle<T>(list: readonly T[], value: T): T[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
 
+// The NewRecipeScreen component renders a form for creating a new recipe, handles form state and validation,
+// and submits the recipe to the repository when the user saves it.
 export default function NewRecipeScreen() {
   const router = useRouter();
   const recipes = useRecipeRepository();
@@ -37,10 +43,12 @@ export default function NewRecipeScreen() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
 
+  // A helper function that updates a specific field in the form values state.
   function setField<K extends keyof RecipeFormValues>(key: K, value: RecipeFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
   }
 
+  // A helper function that updates a specific ingredient row in the form values state.
   function updateIngredient(index: number, patch: Partial<IngredientFormRow>) {
     setValues((current) => ({
       ...current,
@@ -48,6 +56,7 @@ export default function NewRecipeScreen() {
     }));
   }
 
+  // A helper function that updates a specific step in the form values state.
   function updateStep(index: number, text: string) {
     setValues((current) => ({
       ...current,
@@ -55,6 +64,7 @@ export default function NewRecipeScreen() {
     }));
   }
 
+  // The handleSave function validates the form values and submits the new recipe to the repository.
   async function handleSave() {
     // Form-level check for instant feedback; the repository validates again before writing.
     const input = toRecipeInput(values);
@@ -64,6 +74,7 @@ export default function NewRecipeScreen() {
       return;
     }
 
+    // If validation passes, attempt to create the recipe in the repository and handle any errors.
     setSaving(true);
     try {
       const result = await recipes.create(parsed.data);
@@ -77,8 +88,12 @@ export default function NewRecipeScreen() {
     }
   }
 
+  // Determine if there are any validation errors in the form values.
   const hasErrors = Object.keys(errors).length > 0;
 
+  // Render the form for creating a new recipe, including fields for title, description, servings, prep time, cook time,
+  // meal types, ingredients, steps, diet tags, and notes. The form includes buttons for adding/removing ingredients
+  // and steps, and a save button that triggers the handleSave function.
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -265,6 +280,7 @@ export default function NewRecipeScreen() {
   );
 }
 
+// Define styles for the components in the NewRecipeScreen.
 const styles = StyleSheet.create({
   flex: {
     flex: 1,

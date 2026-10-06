@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 
+// This layout is shared across all the routes defined in the /recipes directory.
 export default function RecipesLayout() {
   return (
     <Stack>

@@ -12,6 +12,7 @@ function tabIcon(name: IconName) {
   return TabIcon;
 }
 
+// This layout is shared across all the routes defined in the /(tabs) directory.
 export default function TabLayout() {
   return (
     <Tabs>
