@@ -40,7 +40,6 @@ export default function RecipesScreen() {
           ),
         }}
       />
-      // Render the list of recipes using a FlatList component. If there are no recipes, display a message and a button to create a new recipe.
       <FlatList
         data={recipes}
         keyExtractor={(recipe) => recipe.id}
