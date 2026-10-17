@@ -1,14 +1,9 @@
 import { ID_PATTERN } from "@/validation/patterns";
 import { recipeSchema } from "@/validation/recipeSchema";
+import { newId } from "./newId";
 import type { Recipe, RecipeRepository } from "./RecipeRepository";
 
 const SCHEMA_VERSION = 1;
-
-// Lowercase base-36 time + random part, so it always matches ID_PATTERN.
-function newRecipeId(): string {
-  const random = Math.random().toString(36).slice(2, 10);
-  return `${Date.now().toString(36)}-${random}`;
-}
 
 // Temporary store for Sprint 1: recipes live only while the app is open.
 // Replace with a SQLite implementation of RecipeRepository for #1.
@@ -28,7 +23,7 @@ export function createInMemoryRecipeRepository(
         return { ok: false, error: result.error };
       }
 
-      const id = newRecipeId();
+      const id = newId();
       if (!ID_PATTERN.test(id)) {
         throw new Error("Generated recipe ID is invalid");
       }

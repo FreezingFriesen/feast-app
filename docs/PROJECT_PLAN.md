@@ -47,6 +47,10 @@ planning (no backlog ID yet).
 - [ ] N-05 Assign recipes to slots; move or remove them
 - [ ] N-06 Estimated cost shown for the meal plan
 
+Status: Month/Week planner UI, assign/move/remove and servings are built
+(#4, #17, N-05). Entries are stored in memory until #1 (SQLite) lands.
+N-06 is waiting on ingredient price data.
+
 ### Grocery lists
 - [ ] #6 Generate a weekly grocery list from the meal plan
 - [ ] #18 Grocery list usable offline
@@ -123,7 +127,15 @@ users/{uid}/recipes/{recipeId}
   createdAt, updatedAt, deletedAt?
   schemaVersion
 
-users/{uid}/mealPlans/{planId}     // stores recipe IDs + servings, never copies
+users/{uid}/mealPlanEntries/{entryId}  // one recipe in one slot; recipe ID + servings, never a copy
+  date ("YYYY-MM-DD", 2000-01-01 to 2100-12-31)
+  mealType (breakfast | lunch | dinner)
+  recipeId (^[a-z0-9_-]{1,100}$), servings (int 1-100)
+  createdAt, updatedAt, deletedAt?
+  schemaVersion
+  // One doc per entry so last-edit-wins works per entry, not per week.
+  // Max 10 live entries per date + mealType (repository check).
+  // Limits live in src/validation/mealPlanSchema.ts; mirror them in Security Rules.
 ingredients/{ingredientId}         // shared reference data
   name, pricePerUnit, nutritionPer100g, densityGramsPerCup, dietTags[], allergens[]
 

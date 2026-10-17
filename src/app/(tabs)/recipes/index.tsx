@@ -1,29 +1,10 @@
-import type { Recipe } from "@/repositories/RecipeRepository";
-import { useRecipeRepository } from "@/repositories/RepositoryProvider";
+import { useRecipes } from "@/features/recipes/useRecipes";
 import { Link, Stack } from "expo-router";
-import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 // This screen displays a list of recipes and allows the user to navigate to the "New Recipe" screen.
 export default function RecipesScreen() {
-  const repository = useRecipeRepository();
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-
-  // Load the list of recipes when the component mounts and subscribe to changes in the repository.
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      repository.list().then((list) => {
-        if (active) setRecipes(list);
-      });
-    };
-    load();
-    const unsubscribe = repository.subscribe(load);
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [repository]);
+  const recipes = useRecipes();
 
   // Render the list of recipes or a message indicating that there are no recipes yet.
   return (

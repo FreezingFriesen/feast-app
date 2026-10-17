@@ -23,7 +23,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="meal-planner"
-        options={{ title: "Meal Planner", tabBarIcon: tabIcon("calendar-outline") }}
+        options={{ title: "Meal Planner", headerShown: false, tabBarIcon: tabIcon("calendar-outline") }}
       />
       <Tabs.Screen
         name="grocery-list"
