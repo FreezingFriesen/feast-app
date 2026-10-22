@@ -184,3 +184,13 @@ To be planned.
   one-week Sprint 1.
 - Stakeholder communication plan for Sprint 1 (missing from the plan template).
 - Decide which phones the team tests on (iOS, Android, or both).
+- Upgrade to Expo SDK 58. It fixes the `decode-uri-component` advisory in
+  expo-router's deep-link parsing (moderate DoS, ships in the app). Everyone on
+  the team needs an Expo Go that supports SDK 58.
+- Known `npm audit` advisories with no upstream fix yet, dev tooling only (not in
+  the app): `braces` (Metro/Jest) and `node-forge` (Expo CLI). Re-check with
+  `npm audit` each sprint. Never run `npm audit fix --force` (it downgrades Expo
+  and Firebase).
+- `package.json` `overrides` force `@grpc/grpc-js` ^1.13.6 (Firestore still pins
+  ~1.9) and `js-yaml` ^4.1.1 under `@istanbuljs/load-nyc-config`. Remove each
+  override once the upstream package updates its own dependency.
