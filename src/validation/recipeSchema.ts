@@ -6,6 +6,9 @@ import { NAME_PATTERN } from "./patterns";
 export const UNITS = ["g","kg","ml","l","tsp","tbsp","cup","oz","lb","piece","pinch"] as const;
 export const DIET_TAGS = ["vegan","vegetarian","pescatarian","keto_friendly","gluten_free","dairy_free"] as const;
 export const MEAL_TYPES = ["breakfast","lunch","dinner","snack"] as const;
+// Health Canada's priority food allergens. Shared by recipes (computed from ingredients),
+// user profiles (N-18) and the ingredient data, so all three use the same values.
+export const ALLERGENS = ["peanuts","tree_nuts","milk","eggs","fish","shellfish","sesame","soy","wheat","mustard","sulphites"] as const;
 
 // Helpers: clean the text first (remove control/invisible characters, trim),
 // then check the length rules.

@@ -172,6 +172,19 @@ describe("listBetween", () => {
   });
 });
 
+describe("clear", () => {
+  it("removes every entry and notifies", async () => {
+    const { repo } = setup();
+    const entry = expectOk(await repo.add(input));
+    const listener = jest.fn();
+    repo.subscribe(listener);
+    await repo.clear();
+    expect(await everything(repo)).toEqual([]);
+    expect(await repo.getById(entry.id)).toBeUndefined();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("subscribe", () => {
   it("notifies after every change until unsubscribed", async () => {
     const { repo } = setup();

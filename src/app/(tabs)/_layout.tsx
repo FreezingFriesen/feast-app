@@ -31,7 +31,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="account"
-        options={{ title: "Account", tabBarIcon: tabIcon("person-outline") }}
+        options={{ title: "Account", headerShown: false, tabBarIcon: tabIcon("person-outline") }}
       />
     </Tabs>
   );

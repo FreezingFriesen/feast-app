@@ -24,6 +24,8 @@ export type RecipeRepository = {
   // Returns recipes that are not soft-deleted, newest first.
   list(): Promise<Recipe[]>;
   getById(id: string): Promise<Recipe | undefined>;
+  // Removes every recipe from this device (logout wipe, account deletion).
+  clear(): Promise<void>;
   // Calls the listener after every change. Returns an unsubscribe function.
   subscribe(listener: () => void): () => void;
 };

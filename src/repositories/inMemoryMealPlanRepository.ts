@@ -130,6 +130,11 @@ export function createInMemoryMealPlanRepository(
       return findLive(id);
     },
 
+    async clear() {
+      entries.clear();
+      notify();
+    },
+
     subscribe(listener) {
       listeners.add(listener);
       return () => {

@@ -76,6 +76,23 @@ N-06 is waiting on ingredient price data.
 - [ ] #19 Store recipes and app data on the account; restore on a new device
 - [ ] N-19 Local-first sync: changes saved on device, synced to Firebase on reconnect, last edit wins
 
+Status: The Firebase project isn't available yet, so the Account tab is built
+against an in-memory backend behind the same interfaces. Done so far: validation,
+interfaces, domain errors, the 30-day session, chunked secure token storage, the
+in-memory auth and username backend with a shared contract test suite, the SQLite
+profile cache and the composition root. Built against the in-memory backend:
+- signed-out screens: log in, sign up, forgot password, choose username
+- signed-in page: profile, dietary restrictions, sync status, session info,
+  change password, log out
+- delete account: re-authenticate, typed username, retry-safe deletion
+
+Nothing is ticked until it works against Firebase. N-18 is local only until sync
+exists. Account tab phases:
+3. signed-out UI (done)
+4. signed-in UI (done)
+5. delete account (done)
+6. Firebase, Security Rules and rules tests (blocked until the database exists)
+
 ### Offline
 - [ ] N-20 Stored recipes, meal planning and grocery list generation all work fully offline
 
@@ -101,7 +118,27 @@ N-06 is waiting on ingredient price data.
   the future, and `updatedAt` may be set from the server on sync.
 - **Sessions:** 30 days, enforced by storing the login date and signing out after
   30 days. Token in `expo-secure-store`. Firebase Auth persistence must be set up
-  explicitly on React Native.
+  explicitly on React Native. SecureStore rejects ":" in keys and may reject values
+  over about 2 KB, and Firebase's session has both, so it is stored through our
+  chunked adapter (`src/services/session/chunkedSecureStorage.ts`), never AsyncStorage.
+- **Allergens:** Health Canada's 11 priority allergens (`ALLERGENS` in
+  `src/validation/recipeSchema.ts`), shared by recipes, profiles and the
+  ingredient data.
+- **Profile cache:** `expo-sqlite`, in place before the signed-in Account UI.
+- **Connectivity:** `expo-network` (in Expo Go) behind `ConnectivityService`.
+  Network errors from Firebase are also treated as offline.
+- **Backend choice:** `EXPO_PUBLIC_BACKEND` = `memory` (default) or `firebase`, read
+  only in `src/services/AppProviders.tsx`. Implementations are picked only in
+  `src/services/createAppServices.ts`. The in-memory backend is a development fake
+  that forgets everything on reload. Production builds refuse it, and unknown values
+  are refused. `firebase` is a stub that fails with `backend_not_configured` until
+  Phase 6.
+- **Domain errors:** expected failures are typed results. Anything an implementation
+  throws is a `DomainError` (`src/services/domainErrors.ts`): a plain `Error` with a
+  `code`, not a subclass. Screens never see Firebase error codes.
+- **Local database:** `expo-sqlite` (`feast.db`). The schema lives in
+  `src/storage/migrations.ts` as numbered, constant SQL migrations. Version 1 is
+  `profiles`; recipes and meal plans (#1) add version 2 onwards.
 - **Login by email**; username is a unique display name stored in a `usernames`
   collection.
 - **Nutrition/price data:** API key stays server-side. A script or Cloud Function
@@ -180,6 +217,58 @@ To be planned.
 - Define the ingredient data format (feeds cost, nutrition, unit conversion,
   diet/allergen tags and filters).
 - Decide whether local data is wiped on logout (shared devices).
+- Account defaults to confirm, all in `src/services/account/accountDecisions.ts`:
+  log out wipes local data after confirmation; session expiry signs out but keeps
+  local data; email verification is shown but doesn't block use; username change
+  only in the optional last phase.
+  - Until sync exists, wiping on log out deletes recipes and meal plans for good,
+    because they aren't backed up anywhere. Consider switching the wipe off until
+    sync lands.
+- The Account page says recipes are filtered by dietary restrictions by default
+  (N-04), but that filter isn't built yet.
+- Re-authenticating (e.g. to change password) doesn't restart the 30-day session
+  on the device. The planned server-side `auth_time` check would restart it, so
+  the device is stricter. Decide whether re-authentication should count as a new
+  login.
+- Data model for `users/{uid}`: store `dietaryRestrictions` as
+  `{ allergens[], diets[] } | null` (null = not set yet, empty lists = none), and
+  don't store `email` there (Firebase Auth holds it; a copy goes stale).
+- Firebase user IDs contain capitals, so they don't match the CLAUDE.md ID rule.
+  They use `UID_PATTERN` (`^[A-Za-z0-9]{1,128}$`) instead.
+- The live username check runs before sign-in, so `usernames/{name}` needs `get`
+  (not `list`) for signed-out users, which reveals the uid behind a username. The
+  alternative is a Cloud Function.
+- Cloud Functions need the Blaze (paid) plan. Account deletion (N-17) runs from the
+  app for the capstone (`src/services/account/AccountDeleter.ts`). Order:
+  1. re-authenticate
+  2. the user's synced content
+  3. release the username
+  4. the `users/{uid}` profile (after the username, so a retry can still find the name)
+  5. the auth account
+  6. wipe the phone
+
+  Every step is safe to repeat, so a failed deletion is simply run again. When the
+  project moves to Blaze, add a server-side cleanup (an auth `onDelete` trigger or
+  the "Delete User Data" extension) so data is removed even if the app is closed
+  part way through.
+- Deleting an account is only offered once it has a username. An account whose
+  sign up stopped half way has to choose a username first.
+- Should Recipes, Meal Planner and Grocery List require being signed in? Today an
+  expired session doesn't block them.
+- When the Firebase project is connected (Account Phase 6), check:
+  1. Auth persistence uses `getReactNativePersistence(sessionStore.authStorage)`, not
+     AsyncStorage (`src/services/firebase/client.ts`); the session survives a restart;
+     an iOS reinstall doesn't bring back an old session.
+  2. The real SecureStore token size on iOS and Android fits the chunked storage, and
+     sign-out removes every `feast.session.auth.*` key.
+  3. Security Rules for `users/{uid}` and `usernames/{name}` mirror the schema limits
+     (Zod counts code points), with emulator tests. The emulator runs here with a
+     `demo-` project ID.
+  4. Account deletion removes the subcollections (batches of 500 or fewer), releases
+     the username, deletes `users/{uid}`, then deletes the auth user, and a retry after
+     a failure at any step finishes. Check in the console that nothing is left.
+  5. Restore on a new device downloads and validates the profile and data.
+  6. The shared contract suite (`src/testing/contracts/`) passes against the emulators.
 - Plan Sprints 2 and 3; confirm how the rubric's hours-per-person applies to a
   one-week Sprint 1.
 - Stakeholder communication plan for Sprint 1 (missing from the plan template).
@@ -188,7 +277,9 @@ To be planned.
   expo-router's deep-link parsing (moderate DoS, ships in the app). Everyone on
   the team needs an Expo Go that supports SDK 58.
 - Known `npm audit` advisories with no upstream fix yet, dev tooling only (not in
-  the app): `braces` (Metro/Jest) and `node-forge` (Expo CLI). Re-check with
+  the app): `braces` (Metro/Jest), `node-forge` (Expo CLI) and the copy of `zod`
+  nested inside `@expo/cli`. The app's own `zod` is ^4.6.7, which has the
+  memory-exhaustion fix (GHSA-mrhx-c7xc-m3w5). Re-check with
   `npm audit` each sprint. Never run `npm audit fix --force` (it downgrades Expo
   and Firebase).
 - `package.json` `overrides` force `@grpc/grpc-js` ^1.13.6 (Firestore still pins

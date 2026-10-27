@@ -31,6 +31,8 @@ export type MealPlanRepository = {
   // Entries from startDate to endDate (inclusive, "YYYY-MM-DD"), not soft-deleted, oldest first.
   listBetween(startDate: string, endDate: string): Promise<MealPlanEntry[]>;
   getById(id: string): Promise<MealPlanEntry | undefined>;
+  // Removes every entry from this device (logout wipe, account deletion).
+  clear(): Promise<void>;
   // Calls the listener after every change. Returns an unsubscribe function.
   subscribe(listener: () => void): () => void;
 };

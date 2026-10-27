@@ -53,6 +53,11 @@ export function createInMemoryRecipeRepository(
       return recipe?.deletedAt === undefined ? recipe : undefined;
     },
 
+    async clear() {
+      recipes.clear();
+      notify();
+    },
+
     subscribe(listener) {
       listeners.add(listener);
       return () => {

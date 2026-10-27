@@ -1,12 +1,12 @@
 import { Stack } from "expo-router";
-import { RepositoryProvider } from "@/repositories/RepositoryProvider";
+import { AppProviders } from "@/services/AppProviders";
 
 export default function RootLayout() {
   return (
-    <RepositoryProvider>
+    <AppProviders>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
-    </RepositoryProvider>
+    </AppProviders>
   );
 }

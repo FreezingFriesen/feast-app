@@ -2,16 +2,15 @@
 // such as title, description, ingredients, steps, and diet tags. 
 // The form is validated before submission, and any errors are displayed to the user.
 import { ChipSelect } from "@/components/form/ChipSelect";
+import { issuesToFieldErrors, type FieldErrors } from "@/components/form/fieldErrors";
 import { FieldError, FormField } from "@/components/form/FormField";
 import {
   emptyIngredientRow,
   emptyRecipeForm,
   emptyStepRow,
-  issuesToFieldErrors,
   MAX_INGREDIENT_ROWS,
   MAX_STEP_ROWS,
   toRecipeInput,
-  type FieldErrors,
   type IngredientFormRow,
   type RecipeFormValues,
 } from "@/features/recipes/recipeForm";
