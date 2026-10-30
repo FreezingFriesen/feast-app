@@ -43,3 +43,7 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase admin key for the ingredient import script. Never commit it.
+serviceAccountKey.json
+*firebase-adminsdk*.json
