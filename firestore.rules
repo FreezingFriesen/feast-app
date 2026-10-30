@@ -1,0 +1,132 @@
+rules_version = '2';
+
+// Firestore Security Rules for Feast (Account Phase 6 in docs/PROJECT_PLAN.md).
+// Paste this whole file into Firebase console > Firestore > Rules, then Publish.
+//
+//   users/{uid}                        profile (storedProfileSchema): owner only
+//   users/{uid}/recipes/{id}           the user's recipes: owner only
+//   users/{uid}/mealPlanEntries/{id}   the user's meal plan: owner only
+//   usernames/{username}               { uid }: one owner per name (UsernameRegistry)
+//   ingredients/{ingredientId}         Edwin's data: read only, loaded by the import script
+//
+// Anything not listed is blocked. The limits mirror src/validation. When a limit
+// changes there, change it here too.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // USERNAME_PATTERN in src/validation/patterns.ts (3 to 20 characters).
+    function validUsername(name) {
+      return name is string && name.matches('^[a-z0-9_]{3,20}$');
+    }
+
+    // timestampSchema in src/validation/authSchema.ts (1 Jan 2020 to 31 Dec 2100),
+    // and at most 5 minutes ahead of the server, because phone clocks can be wrong.
+    function validTimestamp(t) {
+      return t is int
+        && t >= 1577836800000
+        && t <= 4133980799999
+        && t <= request.time.toMillis() + 300000;
+    }
+
+    // A list with no duplicates, at most `max` items, all from `allowed`.
+    function validChoices(values, allowed, max) {
+      return values is list
+        && values.size() <= max
+        && values.toSet().size() == values.size()
+        && values.hasOnly(allowed);
+    }
+
+    // dietaryRestrictionsSchema in src/validation/profileSchema.ts.
+    // null = "not set yet". Empty lists = the user chose "none".
+    // Lists: ALLERGENS and DIET_TAGS in src/validation/recipeSchema.ts.
+    function validRestrictions(r) {
+      return r == null || (
+        r is map
+        && r.keys().hasOnly(['allergens', 'diets'])
+        && r.keys().hasAll(['allergens', 'diets'])
+        && validChoices(r.allergens,
+             ['peanuts', 'tree_nuts', 'milk', 'eggs', 'fish', 'shellfish', 'sesame',
+              'soy', 'wheat', 'mustard', 'sulphites'], 11)
+        && validChoices(r.diets,
+             ['vegan', 'vegetarian', 'pescatarian', 'keto_friendly', 'gluten_free',
+              'dairy_free'], 6)
+      );
+    }
+
+    // storedProfileSchema in src/validation/profileSchema.ts. No email or password.
+    function validProfile(p) {
+      return p.keys().hasOnly(['username', 'dietaryRestrictions', 'createdAt', 'updatedAt', 'schemaVersion'])
+        && p.keys().hasAll(['username', 'dietaryRestrictions', 'createdAt', 'updatedAt', 'schemaVersion'])
+        && validUsername(p.username)
+        && validRestrictions(p.dietaryRestrictions)
+        && validTimestamp(p.createdAt)
+        && validTimestamp(p.updatedAt)
+        && p.updatedAt >= p.createdAt
+        && p.schemaVersion == 1;
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid);
+
+      // UsernameRegistry.claim: the profile and usernames/{name} are written in one
+      // batch. The new profile must point at a username claimed for this user.
+      allow create: if isOwner(uid)
+        && validProfile(request.resource.data)
+        && request.resource.data.dietaryRestrictions == null
+        && request.resource.data.updatedAt == request.resource.data.createdAt
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
+
+      // Dietary restrictions (N-18) and sync. The username and createdAt never change.
+      allow update: if isOwner(uid)
+        && validProfile(request.resource.data)
+        && request.resource.data.username == resource.data.username
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      // Account deletion (N-17).
+      allow delete: if isOwner(uid);
+
+      // Synced content: recipes, mealPlanEntries. Only the owner.
+      // Field checks are added here when the sync engine (N-19) is built.
+      match /{collection}/{document=**} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    match /usernames/{username} {
+      // UsernameRegistry.isAvailable: anyone may look up one name.
+      // Nobody can list them all.
+      allow get: if true;
+
+      // UsernameRegistry.claim. "create" fails if the name already exists, so each
+      // name has one owner. The profile in the same batch must use this name, and a
+      // user who already has a profile cannot claim a second name.
+      allow create: if signedIn()
+        && validUsername(username)
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
+
+      // UsernameRegistry.release: only the owner. Releasing a name that is already
+      // free succeeds, so a half-finished account deletion can be retried.
+      allow delete: if signedIn()
+        && (resource == null || resource.data.uid == request.auth.uid);
+    }
+
+    // Shared ingredient data. Signed-in users can read it (least privilege).
+    // Nobody can change it from the app. scripts/importIngredients.ts uses an
+    // admin key, which skips these rules.
+    match /ingredients/{ingredientId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}
