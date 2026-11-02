@@ -256,9 +256,11 @@ To be planned.
 - Should Recipes, Meal Planner and Grocery List require being signed in? Today an
   expired session doesn't block them.
 - When the Firebase project is connected (Account Phase 6), check:
-  1. Auth persistence uses `getReactNativePersistence(sessionStore.authStorage)`, not
-     AsyncStorage (`src/services/firebase/client.ts`); the session survives a restart;
-     an iOS reinstall doesn't bring back an old session.
+  1. The Firebase services get their client from
+     `createFirebaseClient({ authStorage: sessionStore.authStorage })`
+     (`src/services/firebase/client.ts`), so auth persistence is the chunked secure
+     storage, never AsyncStorage; the session survives a restart; an iOS reinstall
+     doesn't bring back an old session.
   2. The real SecureStore token size on iOS and Android fits the chunked storage, and
      sign-out removes every `feast.session.auth.*` key.
   3. Security Rules for `users/{uid}`, `usernames/{name}`, recipes and meal plan

@@ -23,3 +23,6 @@ export const EMAIL_PATTERN =
 
 // Keys that expo-secure-store accepts
 export const SECURE_KEY_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
+
+// Firebase web config values (API key, domains, project ID, sender and app IDs)
+export const FIREBASE_CONFIG_VALUE_PATTERN = /^[A-Za-z0-9._:-]{1,200}$/;
