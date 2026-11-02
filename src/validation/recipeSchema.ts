@@ -20,6 +20,12 @@ const safeText = (min: number, max: number) =>
 const safeName = (max: number) =>
   z.string().transform(cleanText).pipe(z.string().min(1).max(max).regex(NAME_PATTERN));
 
+// Removes duplicates and sorts into vocabulary order, so the same choices are
+// always stored the same way (the Security Rules reject duplicates).
+export function inVocabularyOrder<T extends string>(vocabulary: readonly T[]) {
+  return (values: T[]): T[] => vocabulary.filter((value) => values.includes(value));
+}
+
 export const ingredientRowSchema = z.object({
   ingredientId: z.string().max(100).optional(),   // empty = unmatched
   name: safeName(100),
@@ -34,10 +40,10 @@ export const recipeSchema = z.object({
   servings: z.number().int().min(1).max(100),
   prepTimeMinutes: z.number().int().min(0).max(1440).optional(),
   cookTimeMinutes: z.number().int().min(0).max(1440).optional(),
-  mealTypes: z.array(z.enum(MEAL_TYPES)).max(4).default([]),
+  mealTypes: z.array(z.enum(MEAL_TYPES)).max(4).transform(inVocabularyOrder(MEAL_TYPES)).default([]),
   ingredients: z.array(ingredientRowSchema).min(1).max(50),
   steps: z.array(safeText(1, 1000)).min(1).max(50),
-  dietTags: z.array(z.enum(DIET_TAGS)).max(6).default([]),
+  dietTags: z.array(z.enum(DIET_TAGS)).max(6).transform(inVocabularyOrder(DIET_TAGS)).default([]),
   notes: safeText(0, 1000).optional(),
 });
 

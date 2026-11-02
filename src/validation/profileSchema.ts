@@ -2,18 +2,12 @@
 // User profile (N-18, #19): username and dietary restrictions.
 import { z } from "zod";
 import { storedUsernameSchema, timestampSchema } from "./authSchema";
-import { ALLERGENS, DIET_TAGS } from "./recipeSchema";
+import { ALLERGENS, DIET_TAGS, inVocabularyOrder } from "./recipeSchema";
 
 // Limits. Mirror these in the Firestore Security Rules for users/{uid}.
 export const PROFILE_SCHEMA_VERSION = 1;
 export const MAX_ALLERGENS = ALLERGENS.length;
 export const MAX_DIETS = DIET_TAGS.length;
-
-// Removes duplicates and sorts into vocabulary order, so the same choices are
-// always stored the same way.
-function inVocabularyOrder<T extends string>(vocabulary: readonly T[]) {
-  return (values: T[]): T[] => vocabulary.filter((value) => values.includes(value));
-}
 
 // Empty lists mean the user chose "none". "Not set yet" is a null dietaryRestrictions
 // on the profile, not an empty object.
