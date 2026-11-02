@@ -97,9 +97,25 @@ describe("claiming a username (sign up)", () => {
     await assertFails(claim(signedOut(), "alice", "alice_1"));
   });
 
+  it("allows usernames of 3 and 20 characters", async () => {
+    await assertSucceeds(claim(asUser("alice"), "alice", "abc"));
+    await assertSucceeds(claim(asUser("bob"), "bob", "b".repeat(20)));
+  });
+
+  it("denies a username document with an extra field", async () => {
+    const db = asUser("alice");
+    const batch = writeBatch(db);
+    batch.set(doc(db, "usernames", "alice_1"), { uid: "alice", isAdmin: true });
+    batch.set(doc(db, "users", "alice"), newProfile("alice_1"));
+    await assertFails(batch.commit());
+  });
+
   for (const [label, username, profile] of [
     ["a username with capitals", "Alice", newProfile("Alice")],
     ["a username that is too short", "ab", newProfile("ab")],
+    ["a username of 21 characters", "a".repeat(21), newProfile("a".repeat(21))],
+    ["a profile username different from the claimed name", "alice_1", newProfile("alice_2")],
+    ["updatedAt different from createdAt", "alice_1", { ...newProfile("alice_1"), updatedAt: Date.now() + 1000 }],
     ["an attack string as username", "a';drop", newProfile("a';drop")],
     ["an email in the profile", "alice_1", { ...newProfile("alice_1"), email: "a@b.com" }],
     ["restrictions set at sign up", "alice_1", { ...newProfile("alice_1"), dietaryRestrictions: { allergens: [], diets: [] } }],
@@ -158,7 +174,19 @@ describe("updating a profile (dietary restrictions, N-18)", () => {
     await assertFails(updateDoc(doc(asUser("bob"), "users/alice"), { dietaryRestrictions: restrictions }));
   });
 
+  // Phone clocks can be wrong, so up to 5 minutes ahead of the server is accepted.
+  it("allows updatedAt 4 minutes ahead", async () => {
+    await seedAccount("alice", "alice_1");
+    await assertSucceeds(updateDoc(doc(asUser("alice"), "users/alice"), { updatedAt: Date.now() + 4 * 60_000 }));
+  });
+
+  it("denies updatedAt more than 5 minutes ahead", async () => {
+    await seedAccount("alice", "alice_1");
+    await assertFails(updateDoc(doc(asUser("alice"), "users/alice"), { updatedAt: Date.now() + 6 * 60_000 }));
+  });
+
   for (const [label, patch] of [
+    ["an extra key in the restrictions", { dietaryRestrictions: { allergens: [], diets: [], notes: "x" } }],
     ["changing the username", { username: "new_name" }],
     ["changing createdAt", { createdAt: Date.UTC(2021, 0, 1) }],
     ["an allergen not on the list", { dietaryRestrictions: { allergens: ["gluten"], diets: [] } }],
