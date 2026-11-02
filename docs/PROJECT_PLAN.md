@@ -295,8 +295,10 @@ To be planned.
   expo-router's deep-link parsing (moderate DoS, ships in the app). Everyone on
   the team needs an Expo Go that supports SDK 58.
 - Known `npm audit` advisories with no upstream fix yet, dev tooling only (not in
-  the app): `braces` (Metro/Jest), `node-forge` (Expo CLI) and the copy of `zod`
-  nested inside `@expo/cli`. The app's own `zod` is ^4.6.7, which has the
+  the app): `braces` (Metro/Jest), `node-forge` (Expo CLI), the copy of `zod`
+  nested inside `@expo/cli`, and `uuid` under `@expo/ngrok`. `@expo/ngrok` is a
+  dev dependency so `expo start --tunnel` works on campus Wi-Fi; installing it
+  globally doesn't work on Windows, because Expo CLI can't find npm's global folder. The app's own `zod` is ^4.6.7, which has the
   memory-exhaustion fix (GHSA-mrhx-c7xc-m3w5). Re-check with
   `npm audit` each sprint. Never run `npm audit fix --force` (it downgrades Expo
   and Firebase).
