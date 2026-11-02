@@ -125,6 +125,12 @@ service cloud.firestore {
         && p.schemaVersion == 1;
     }
 
+    // Does uid hold usernames/{name} once this write is done?
+    function nameHeldBy(name, uid) {
+      let path = /databases/$(database)/documents/usernames/$(name);
+      return existsAfter(path) && getAfter(path).data.uid == uid;
+    }
+
     // The fields every synced record has besides its data (the Recipe and MealPlanEntry
     // types). The id is the document ID, not a field. schemaVersion: SCHEMA_VERSION in
     // the repositories.
@@ -222,8 +228,13 @@ service cloud.firestore {
         && request.resource.data.username == resource.data.username
         && request.resource.data.createdAt == resource.data.createdAt;
 
-      // Account deletion (N-17).
-      allow delete: if isOwner(uid);
+      // Account deletion (N-17). Only once the user no longer holds the username, or a
+      // user could delete the profile, claim another name, and repeat (one account
+      // holding many names). AccountDeleter releases the name first, and either order
+      // in one batch works. Deleting a profile that is already gone, or whose name
+      // someone else has claimed since, is allowed, so a deletion can be retried.
+      allow delete: if isOwner(uid)
+        && (resource == null || !nameHeldBy(resource.data.username, uid));
 
       // Synced content (N-19): only these two collections, only the owner. Anything
       // else under users/{uid} is blocked. Delete has no ID check, so the owner can

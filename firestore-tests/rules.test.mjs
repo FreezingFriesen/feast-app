@@ -203,15 +203,62 @@ describe("updating a profile (dietary restrictions, N-18)", () => {
   }
 });
 
+// The profile can only be deleted once its username is released, so one account
+// cannot collect names by deleting its profile and claiming again.
 describe("deleting a profile (N-17)", () => {
-  it("allows the owner", async () => {
+  it("denies the owner while they still hold the username", async () => {
     await seedAccount("alice", "alice_1");
+    await assertFails(deleteDoc(doc(asUser("alice"), "users/alice")));
+  });
+
+  it("allows the owner after releasing the username (AccountDeleter's order)", async () => {
+    await seedAccount("alice", "alice_1");
+    const db = asUser("alice");
+    await assertSucceeds(deleteDoc(doc(db, "usernames/alice_1")));
+    await assertSucceeds(deleteDoc(doc(db, "users/alice")));
+  });
+
+  it("allows releasing the username and deleting the profile in one batch", async () => {
+    await seedAccount("alice", "alice_1");
+    const db = asUser("alice");
+    const batch = writeBatch(db);
+    batch.delete(doc(db, "users", "alice"));
+    batch.delete(doc(db, "usernames", "alice_1"));
+    await assertSucceeds(batch.commit());
+  });
+
+  it("allows deleting a profile that is already gone (retry)", async () => {
     await assertSucceeds(deleteDoc(doc(asUser("alice"), "users/alice")));
+  });
+
+  it("allows deleting the profile when someone else has claimed the freed name", async () => {
+    await seed("users/alice", newProfile("alice_1"));
+    await seed("usernames/alice_1", { uid: "bob" });
+    await assertSucceeds(deleteDoc(doc(asUser("alice"), "users/alice")));
+  });
+
+  it("lets the user claim again once both are gone, but holding one name at a time", async () => {
+    await seedAccount("alice", "alice_1");
+    const db = asUser("alice");
+    await assertFails(deleteDoc(doc(db, "users/alice")));
+    await assertFails(claim(db, "alice", "alice_2"));
+    await assertSucceeds(deleteDoc(doc(db, "usernames/alice_1")));
+    await assertSucceeds(deleteDoc(doc(db, "users/alice")));
+    await assertSucceeds(claim(db, "alice", "alice_2"));
+    // alice_1 is free again; alice holds only alice_2.
+    await assertSucceeds(claim(asUser("bob"), "bob", "alice_1"));
   });
 
   it("denies another user", async () => {
     await seedAccount("alice", "alice_1");
     await assertFails(deleteDoc(doc(asUser("bob"), "users/alice")));
+    await seed("usernames/alice_1", { uid: "bob" });
+    await assertFails(deleteDoc(doc(asUser("bob"), "users/alice")));
+  });
+
+  it("denies signed-out users", async () => {
+    await seed("users/alice", newProfile("alice_1"));
+    await assertFails(deleteDoc(doc(signedOut(), "users/alice")));
   });
 });
 
