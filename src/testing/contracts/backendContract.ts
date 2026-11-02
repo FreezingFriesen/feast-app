@@ -410,7 +410,8 @@ export function describeRemoteProfileStoreContract(name: string, harness: Backen
     it("deletes only the signed-in user's own profile, and deleting twice succeeds", async () => {
       const { auth, usernames, remoteProfiles, email, signUp } = await setupBackend(harness);
       const owner = await signUp(email);
-      await usernames.claim(owner.uid, harness.uniqueUsername());
+      const username = harness.uniqueUsername();
+      await usernames.claim(owner.uid, username);
       await auth.signOut();
 
       const other = await signUp();
@@ -419,6 +420,9 @@ export function describeRemoteProfileStoreContract(name: string, harness: Backen
 
       await auth.signOut();
       expectUser(await auth.signIn({ email, password: PASSWORD }));
+      // AccountDeleter's order: the Security Rules refuse the profile delete while the
+      // user still holds the username.
+      expect(await usernames.release(owner.uid, username)).toEqual({ ok: true });
       expect(await remoteProfiles.delete(owner.uid)).toEqual({ ok: true });
       expect(await remoteProfiles.fetch(owner.uid)).toEqual({ ok: true, profile: null });
       expect(await remoteProfiles.delete(owner.uid)).toEqual({ ok: true });

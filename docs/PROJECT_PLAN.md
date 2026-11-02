@@ -256,19 +256,37 @@ To be planned.
 - Should Recipes, Meal Planner and Grocery List require being signed in? Today an
   expired session doesn't block them.
 - When the Firebase project is connected (Account Phase 6), check:
-  1. Auth persistence uses `getReactNativePersistence(sessionStore.authStorage)`, not
-     AsyncStorage (`src/services/firebase/client.ts`); the session survives a restart;
-     an iOS reinstall doesn't bring back an old session.
+  1. The Firebase services get their client from
+     `createFirebaseClient({ authStorage: sessionStore.authStorage })`
+     (`src/services/firebase/client.ts`), so auth persistence is the chunked secure
+     storage, never AsyncStorage; the session survives a restart; an iOS reinstall
+     doesn't bring back an old session.
   2. The real SecureStore token size on iOS and Android fits the chunked storage, and
      sign-out removes every `feast.session.auth.*` key.
-  3. Security Rules for `users/{uid}` and `usernames/{name}` mirror the schema limits
-     (Zod counts code points), with emulator tests. The emulator runs here with a
-     `demo-` project ID.
+  3. Security Rules for `users/{uid}`, `usernames/{name}`, recipes and meal plan
+     entries mirror the schema limits, with emulator tests. The emulator runs here with
+     a `demo-` project ID. Zod counts code points, but in the emulator Rules `size()`
+     counts UTF-16 units (an emoji is 2), so text lengths are checked with a regex
+     (`validText` in `firestore.rules`). Re-check on the real project that a 500-emoji
+     description is accepted and 501 is refused.
   4. Account deletion removes the subcollections (batches of 500 or fewer), releases
      the username, deletes `users/{uid}`, then deletes the auth user, and a retry after
      a failure at any step finishes. Check in the console that nothing is left.
   5. Restore on a new device downloads and validates the profile and data.
   6. The shared contract suite (`src/testing/contracts/`) passes against the emulators.
+- Security Rules can't check the items inside a list (no loops), so for recipes they
+  check only each list's type and size. Not checked on the server: each ingredient
+  row (keys, name, quantity, unit, note, ingredientId), each step's length, `cleanText`
+  on free text (NFC, control and invisible characters, trim), and the 10-entries-per-slot
+  meal plan limit. A modified app could store a bad ingredient row or step, but only
+  in its own account, and every device validates downloads before using them. The
+  full list is at the top of `firestore.rules`. A Cloud Function (Blaze plan) could
+  check them on the server later. No data model change is planned for this.
+- The recipe Rules accept an optional `allergens` list (the data model computes it from
+  the ingredients), but `recipeSchema` doesn't produce it yet. Add it there when the
+  allergen computation is built. `source` in the data model isn't in `recipeSchema`
+  either, so the Rules refuse it until recipe import is built (the ingredient row's
+  `rawText` isn't in `ingredientRowSchema`, and rows aren't checked by the Rules).
 - Plan Sprints 2 and 3; confirm how the rubric's hours-per-person applies to a
   one-week Sprint 1.
 - Stakeholder communication plan for Sprint 1 (missing from the plan template).

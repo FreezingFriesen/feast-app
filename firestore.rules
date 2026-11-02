@@ -1,0 +1,307 @@
+rules_version = '2';
+
+// Firestore Security Rules for Feast (Account Phase 6 in docs/PROJECT_PLAN.md).
+// Paste this whole file into Firebase console > Firestore > Rules, then Publish.
+//
+//   users/{uid}                        profile (storedProfileSchema): owner only
+//   users/{uid}/recipes/{id}           the user's recipes (recipeSchema): owner only
+//   users/{uid}/mealPlanEntries/{id}   the user's meal plan (mealPlanEntrySchema): owner only
+//   usernames/{username}               { uid }: one owner per name (UsernameRegistry)
+//   ingredients/{ingredientId}         Edwin's data: read only, loaded by the import script
+//
+// Anything not listed is blocked. The limits mirror src/validation. When a limit
+// changes there, change it here too.
+//
+// What these rules cannot check: Rules have no loops, so the items inside a list are
+// not checked one by one, only the list's type and size. The app checks them before
+// every write (repository) and on every download (sync), so a modified app can only
+// store bad items in its own account. Not mirrored here:
+//   - each ingredient row (ingredientRowSchema): its keys, name (safeName, 100),
+//     quantity (above 0, at most 100000), unit (UNITS), note (100), ingredientId (100)
+//   - each step's length (1 to 1000)
+//   - cleanText on free text (NFC, control and invisible characters, trim). Names are
+//     covered by the NAME_PATTERN allowlist; free text only has its length checked.
+//   - MAX_ENTRIES_PER_SLOT (10 live entries per date and meal type), a repository check
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // USERNAME_PATTERN in src/validation/patterns.ts (3 to 20 characters).
+    function validUsername(name) {
+      return name is string && name.matches('^[a-z0-9_]{3,20}$');
+    }
+
+    // timestampSchema in src/validation/authSchema.ts (1 Jan 2020 to 31 Dec 2100),
+    // and at most 5 minutes ahead of the server, because phone clocks can be wrong.
+    function validTimestamp(t) {
+      return t is int
+        && t >= 1577836800000
+        && t <= 4133980799999
+        && t <= request.time.toMillis() + 300000;
+    }
+
+    // A list with no duplicates, at most `max` items, all from `allowed`.
+    function validChoices(values, allowed, max) {
+      return values is list
+        && values.size() <= max
+        && values.toSet().size() == values.size()
+        && values.hasOnly(allowed);
+    }
+
+    // The fixed lists, defined once. ALLERGENS, DIET_TAGS and MEAL_TYPES are in
+    // src/validation/recipeSchema.ts, PLANNER_MEAL_TYPES in src/validation/mealPlanSchema.ts.
+    function allergenList() {
+      return ['peanuts', 'tree_nuts', 'milk', 'eggs', 'fish', 'shellfish', 'sesame',
+              'soy', 'wheat', 'mustard', 'sulphites'];
+    }
+
+    function dietTagList() {
+      return ['vegan', 'vegetarian', 'pescatarian', 'keto_friendly', 'gluten_free', 'dairy_free'];
+    }
+
+    function recipeMealTypeList() {
+      return ['breakfast', 'lunch', 'dinner', 'snack'];
+    }
+
+    // The planner has Breakfast, Lunch and Dinner slots (#17). "snack" is a recipe tag only.
+    function plannerMealTypeList() {
+      return ['breakfast', 'lunch', 'dinner'];
+    }
+
+    // ID_PATTERN in src/validation/patterns.ts, for the document IDs of synced records.
+    function validId(id) {
+      return id is string && id.matches('^[a-z0-9_-]{1,100}$');
+    }
+
+    // A string of min to max characters (Zod's min and max, after cleanText). Zod counts
+    // code points (an emoji is one character), but size() counts UTF-16 units (an emoji
+    // is two; checked in the emulator), so the regex counts instead: "." matches one
+    // code point, and (?s) lets it match new lines.
+    function validText(s, min, max) {
+      return s is string && s.matches('(?s).{' + string(min) + ',' + string(max) + '}');
+    }
+
+    // safeName in src/validation/recipeSchema.ts: NAME_PATTERN in src/validation/patterns.ts.
+    function validName(s, max) {
+      return validText(s, 1, max) && s.matches("^[\\p{L}\\p{M}\\p{N} .,'’&()\\-!/%+]+$");
+    }
+
+    function validInt(n, min, max) {
+      return n is int && n >= min && n <= max;
+    }
+
+    function validList(values, min, max) {
+      return values is list && values.size() >= min && values.size() <= max;
+    }
+
+    // dietaryRestrictionsSchema in src/validation/profileSchema.ts.
+    // null = "not set yet". Empty lists = the user chose "none".
+    function validRestrictions(r) {
+      return r == null || (
+        r is map
+        && r.keys().hasOnly(['allergens', 'diets'])
+        && r.keys().hasAll(['allergens', 'diets'])
+        && validChoices(r.allergens, allergenList(), allergenList().size())
+        && validChoices(r.diets, dietTagList(), dietTagList().size())
+      );
+    }
+
+    // storedProfileSchema in src/validation/profileSchema.ts. No email or password.
+    function validProfile(p) {
+      return p.keys().hasOnly(['username', 'dietaryRestrictions', 'createdAt', 'updatedAt', 'schemaVersion'])
+        && p.keys().hasAll(['username', 'dietaryRestrictions', 'createdAt', 'updatedAt', 'schemaVersion'])
+        && validUsername(p.username)
+        && validRestrictions(p.dietaryRestrictions)
+        && validTimestamp(p.createdAt)
+        && validTimestamp(p.updatedAt)
+        && p.updatedAt >= p.createdAt
+        && p.schemaVersion == 1;
+    }
+
+    // Last edit wins (N-19): an update cannot be older than the stored copy, so a device
+    // that syncs late cannot overwrite a newer edit. Equal is allowed (a retried write,
+    // or an update that leaves updatedAt as it is).
+    function notStale() {
+      return request.resource.data.updatedAt >= resource.data.updatedAt;
+    }
+
+    // Does uid hold usernames/{name} once this write is done?
+    function nameHeldBy(name, uid) {
+      let path = /databases/$(database)/documents/usernames/$(name);
+      return existsAfter(path) && getAfter(path).data.uid == uid;
+    }
+
+    // The fields every synced record has besides its data (the Recipe and MealPlanEntry
+    // types). The id is the document ID, not a field. schemaVersion: SCHEMA_VERSION in
+    // the repositories.
+    function validRecordFields(d) {
+      return validTimestamp(d.createdAt)
+        && validTimestamp(d.updatedAt)
+        && d.updatedAt >= d.createdAt
+        && (!('deletedAt' in d) || validTimestamp(d.deletedAt))
+        && d.schemaVersion == 1;
+    }
+
+    // What an update cannot change: createdAt, and a soft delete. Once deletedAt is set
+    // it stays, so a sync cannot bring a deleted record back.
+    function keepsRecordFields() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return after.createdAt == before.createdAt
+        && (!('deletedAt' in before) || after.get('deletedAt', null) == before.deletedAt);
+    }
+
+    // recipeSchema in src/validation/recipeSchema.ts, plus the record fields (Recipe type).
+    // allergens is in the data model (computed from the ingredients) but not in
+    // recipeSchema yet, so it is optional here.
+    function validRecipe(r) {
+      let required = ['title', 'servings', 'mealTypes', 'ingredients', 'steps', 'dietTags',
+                      'createdAt', 'updatedAt', 'schemaVersion'];
+      let optional = ['description', 'prepTimeMinutes', 'cookTimeMinutes', 'notes',
+                      'allergens', 'deletedAt'];
+      return r.keys().hasAll(required)
+        && r.keys().hasOnly(required.concat(optional))
+        && validName(r.title, 100)
+        && (!('description' in r) || validText(r.description, 0, 500))
+        && validInt(r.servings, 1, 100)
+        && (!('prepTimeMinutes' in r) || validInt(r.prepTimeMinutes, 0, 1440))
+        && (!('cookTimeMinutes' in r) || validInt(r.cookTimeMinutes, 0, 1440))
+        && validChoices(r.mealTypes, recipeMealTypeList(), 4)
+        && validList(r.ingredients, 1, 50)
+        && validList(r.steps, 1, 50)
+        && validChoices(r.dietTags, dietTagList(), 6)
+        && (!('notes' in r) || validText(r.notes, 0, 1000))
+        && (!('allergens' in r) || validChoices(r.allergens, allergenList(), allergenList().size()))
+        && validRecordFields(r);
+    }
+
+    // isRealDate in src/validation/mealPlanSchema.ts: "2026-02-30" matches the pattern
+    // but is not a real day.
+    function isRealDate(key) {
+      let parts = key.split('-');
+      let year = int(parts[0]);
+      let month = int(parts[1]);
+      let day = int(parts[2]);
+      let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+      let monthLengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      return month >= 1 && month <= 12 && day >= 1 && day <= monthLengths[month - 1];
+    }
+
+    // dateKeySchema in src/validation/mealPlanSchema.ts: "YYYY-MM-DD" (ASCII digits),
+    // MIN_DATE_KEY to MAX_DATE_KEY. Keys compare correctly as strings.
+    function validDateKey(key) {
+      return key is string
+        && key.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && key >= '2000-01-01'
+        && key <= '2100-12-31'
+        && isRealDate(key);
+    }
+
+    // mealPlanEntrySchema in src/validation/mealPlanSchema.ts, plus the record fields
+    // (MealPlanEntry type).
+    function validMealPlanEntry(e) {
+      let required = ['date', 'mealType', 'recipeId', 'servings', 'createdAt', 'updatedAt',
+                      'schemaVersion'];
+      return e.keys().hasAll(required)
+        && e.keys().hasOnly(required.concat(['deletedAt']))
+        && validDateKey(e.date)
+        && e.mealType in plannerMealTypeList()
+        && validId(e.recipeId)
+        && validInt(e.servings, 1, 100)
+        && validRecordFields(e);
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid);
+
+      // UsernameRegistry.claim: the profile and usernames/{name} are written in one
+      // batch. The new profile must point at a username claimed for this user.
+      allow create: if isOwner(uid)
+        && validProfile(request.resource.data)
+        && request.resource.data.dietaryRestrictions == null
+        && request.resource.data.updatedAt == request.resource.data.createdAt
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
+
+      // Dietary restrictions (N-18) and sync. The username and createdAt never change.
+      allow update: if isOwner(uid)
+        && validProfile(request.resource.data)
+        && notStale()
+        && request.resource.data.username == resource.data.username
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      // Account deletion (N-17). Only once the user no longer holds the username, or a
+      // user could delete the profile, claim another name, and repeat (one account
+      // holding many names). AccountDeleter releases the name first, and either order
+      // in one batch works. Deleting a profile that is already gone, or whose name
+      // someone else has claimed since, is allowed, so a deletion can be retried.
+      allow delete: if isOwner(uid)
+        && (resource == null || !nameHeldBy(resource.data.username, uid));
+
+      // Synced content (N-19): only these two collections, only the owner. Anything
+      // else under users/{uid} is blocked. Delete has no ID check, so the owner can
+      // always remove a document.
+      match /recipes/{recipeId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && validId(recipeId)
+          && validRecipe(request.resource.data);
+        allow update: if isOwner(uid)
+          && validId(recipeId)
+          && validRecipe(request.resource.data)
+          && notStale()
+          && keepsRecordFields();
+      }
+
+      match /mealPlanEntries/{entryId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && validId(entryId)
+          && validMealPlanEntry(request.resource.data);
+        // mealPlanEntryUpdateSchema: an entry can move or change servings, but its
+        // recipe cannot change.
+        allow update: if isOwner(uid)
+          && validId(entryId)
+          && validMealPlanEntry(request.resource.data)
+          && notStale()
+          && keepsRecordFields()
+          && request.resource.data.recipeId == resource.data.recipeId;
+      }
+    }
+
+    match /usernames/{username} {
+      // UsernameRegistry.isAvailable: anyone may look up one name.
+      // Nobody can list them all.
+      allow get: if true;
+
+      // UsernameRegistry.claim. "create" fails if the name already exists, so each
+      // name has one owner. The profile in the same batch must use this name, and a
+      // user who already has a profile cannot claim a second name.
+      allow create: if signedIn()
+        && validUsername(username)
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
+
+      // UsernameRegistry.release: only the owner. Releasing a name that is already
+      // free succeeds, so a half-finished account deletion can be retried.
+      allow delete: if signedIn()
+        && (resource == null || resource.data.uid == request.auth.uid);
+    }
+
+    // Shared ingredient data. Signed-in users can read it (least privilege).
+    // Nobody can change it from the app. scripts/importIngredients.ts uses an
+    // admin key, which skips these rules.
+    match /ingredients/{ingredientId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}
