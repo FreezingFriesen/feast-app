@@ -125,6 +125,13 @@ service cloud.firestore {
         && p.schemaVersion == 1;
     }
 
+    // Last edit wins (N-19): an update cannot be older than the stored copy, so a device
+    // that syncs late cannot overwrite a newer edit. Equal is allowed (a retried write,
+    // or an update that leaves updatedAt as it is).
+    function notStale() {
+      return request.resource.data.updatedAt >= resource.data.updatedAt;
+    }
+
     // Does uid hold usernames/{name} once this write is done?
     function nameHeldBy(name, uid) {
       let path = /databases/$(database)/documents/usernames/$(name);
@@ -225,6 +232,7 @@ service cloud.firestore {
       // Dietary restrictions (N-18) and sync. The username and createdAt never change.
       allow update: if isOwner(uid)
         && validProfile(request.resource.data)
+        && notStale()
         && request.resource.data.username == resource.data.username
         && request.resource.data.createdAt == resource.data.createdAt;
 
@@ -247,6 +255,7 @@ service cloud.firestore {
         allow update: if isOwner(uid)
           && validId(recipeId)
           && validRecipe(request.resource.data)
+          && notStale()
           && keepsRecordFields();
       }
 
@@ -260,6 +269,7 @@ service cloud.firestore {
         allow update: if isOwner(uid)
           && validId(entryId)
           && validMealPlanEntry(request.resource.data)
+          && notStale()
           && keepsRecordFields()
           && request.resource.data.recipeId == resource.data.recipeId;
       }

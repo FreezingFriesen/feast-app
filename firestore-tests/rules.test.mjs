@@ -671,6 +671,39 @@ describe("meal plan entries", () => {
   });
 });
 
+// Last edit wins (N-19): an older device cannot overwrite a newer edit.
+describe("stale writes", () => {
+  // The stored copy was created 10 minutes ago and last edited 1 minute ago.
+  const stored = (data) => ({ ...data, createdAt: Date.now() - 10 * 60_000, updatedAt: Date.now() - 60_000 });
+
+  for (const [label, path, make] of [
+    ["profile", "users/alice", () => newProfile("alice_1")],
+    ["recipe", RECIPE, () => newRecipe()],
+    ["meal plan entry", ENTRY, () => newEntry()],
+  ]) {
+    it(`denies a ${label} update with an older updatedAt`, async () => {
+      const current = stored(make());
+      await seed(path, current);
+      const db = asUser("alice");
+      await assertFails(updateDoc(doc(db, path), { updatedAt: current.updatedAt - 1 }));
+      await assertFails(setDoc(doc(db, path), { ...current, updatedAt: current.updatedAt - 4 * 60_000 }));
+    });
+
+    it(`allows a ${label} update with an equal or newer updatedAt`, async () => {
+      const current = stored(make());
+      await seed(path, current);
+      const db = asUser("alice");
+      await assertSucceeds(updateDoc(doc(db, path), { updatedAt: current.updatedAt }));
+      await assertSucceeds(setDoc(doc(db, path), { ...current, updatedAt: current.updatedAt }));
+      await assertSucceeds(updateDoc(doc(db, path), { updatedAt: Date.now() }));
+    });
+  }
+
+  it("does not affect create", async () => {
+    await assertSucceeds(setDoc(doc(asUser("alice"), RECIPE), newRecipe(Date.UTC(2021, 0, 1))));
+  });
+});
+
 describe("ingredients", () => {
   it("allows signed-in users to read", async () => {
     await seed("ingredients/all_purpose_flour", { name: "All-purpose flour" });
