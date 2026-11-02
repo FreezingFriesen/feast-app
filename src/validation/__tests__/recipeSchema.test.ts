@@ -81,9 +81,12 @@ describe("recipeSchema", () => {
     expect(accepts({ ...valid, title: "‮" })).toBe(false); // only a right-to-left override
   });
 
+  // firestore.rules counts the same way (see validText there).
   it("counts length in code points, so an emoji counts as one character", () => {
     expect(accepts({ ...valid, description: "🍕".repeat(500) })).toBe(true);
     expect(accepts({ ...valid, description: "🍕".repeat(501) })).toBe(false);
+    expect(accepts({ ...valid, title: "𠀀".repeat(100) })).toBe(true); // a letter outside the BMP
+    expect(accepts({ ...valid, title: "𠀀".repeat(101) })).toBe(false);
   });
 
   it.each([
