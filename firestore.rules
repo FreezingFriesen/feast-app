@@ -1,45 +1,31 @@
 rules_version = '2';
 
-// Firestore Security Rules for Feast (Account Phase 6 in docs/PROJECT_PLAN.md).
-// Paste this whole file into Firebase console > Firestore > Rules, then Publish.
-//
-//   users/{uid}                        profile (storedProfileSchema): owner only
-//   users/{uid}/recipes/{id}           the user's recipes (recipeSchema): owner only
-//   users/{uid}/mealPlanEntries/{id}   the user's meal plan (mealPlanEntrySchema): owner only
-//   usernames/{username}               { uid }: one owner per name (UsernameRegistry)
-//   ingredients/{ingredientId}         Edwin's data: read only, loaded by the import script
-//
-// Anything not listed is blocked. The limits mirror src/validation. When a limit
-// changes there, change it here too.
-//
-// What these rules cannot check: Rules have no loops, so the items inside a list are
-// not checked one by one, only the list's type and size. The app checks them before
-// every write (repository) and on every download (sync), so a modified app can only
-// store bad items in its own account. Not mirrored here:
-//   - each ingredient row (ingredientRowSchema): its keys, name (safeName, 100),
-//     quantity (above 0, at most 100000), unit (UNITS), note (100), ingredientId (100)
-//   - each step's length (1 to 1000)
-//   - cleanText on free text (NFC, control and invisible characters, trim). Names are
-//     covered by the NAME_PATTERN allowlist; free text only has its length checked.
-//   - MAX_ENTRIES_PER_SLOT (10 live entries per date and meal type), a repository check
+// Firestore Security Rules for Feast
+//   users/{uid}                        profile: owner only
+//   users/{uid}/recipes/{id}           recipes: owner only
+//   users/{uid}/mealPlanEntries/{id}   meal plan: owner only
+//   usernames/{username}               one owner per username
+//   ingredients/{ingredientId}         Edwin's data: read only
+// Anything not listed is blocked.
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Is someone logged in?
     function signedIn() {
       return request.auth != null;
     }
 
+    // Is the logged-in user the owner?
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // USERNAME_PATTERN in src/validation/patterns.ts (3 to 20 characters).
+    // 3 to 20 lowercase letters, numbers or _
     function validUsername(name) {
       return name is string && name.matches('^[a-z0-9_]{3,20}$');
     }
 
-    // timestampSchema in src/validation/authSchema.ts (1 Jan 2020 to 31 Dec 2100),
-    // and at most 5 minutes ahead of the server, because phone clocks can be wrong.
+    // A real date and time, at most 5 minutes in the future
     function validTimestamp(t) {
       return t is int
         && t >= 1577836800000
@@ -47,7 +33,7 @@ service cloud.firestore {
         && t <= request.time.toMillis() + 300000;
     }
 
-    // A list with no duplicates, at most `max` items, all from `allowed`.
+    // A list with no duplicates, only allowed values
     function validChoices(values, allowed, max) {
       return values is list
         && values.size() <= max
@@ -55,54 +41,53 @@ service cloud.firestore {
         && values.hasOnly(allowed);
     }
 
-    // The fixed lists, defined once. ALLERGENS, DIET_TAGS and MEAL_TYPES are in
-    // src/validation/recipeSchema.ts, PLANNER_MEAL_TYPES in src/validation/mealPlanSchema.ts.
+    // Health Canada's 11 allergens
     function allergenList() {
       return ['peanuts', 'tree_nuts', 'milk', 'eggs', 'fish', 'shellfish', 'sesame',
               'soy', 'wheat', 'mustard', 'sulphites'];
     }
 
+    // Allowed diet tags
     function dietTagList() {
       return ['vegan', 'vegetarian', 'pescatarian', 'keto_friendly', 'gluten_free', 'dairy_free'];
     }
 
+    // Meal types a recipe can have
     function recipeMealTypeList() {
       return ['breakfast', 'lunch', 'dinner', 'snack'];
     }
 
-    // The planner has Breakfast, Lunch and Dinner slots (#17). "snack" is a recipe tag only.
+    // Meal planner slots
     function plannerMealTypeList() {
       return ['breakfast', 'lunch', 'dinner'];
     }
 
-    // ID_PATTERN in src/validation/patterns.ts, for the document IDs of synced records.
+    // Document id: lowercase letters, numbers, _ or -
     function validId(id) {
       return id is string && id.matches('^[a-z0-9_-]{1,100}$');
     }
 
-    // A string of min to max characters (Zod's min and max, after cleanText). Zod counts
-    // code points (an emoji is one character), but size() counts UTF-16 units (an emoji
-    // is two; checked in the emulator), so the regex counts instead: "." matches one
-    // code point, and (?s) lets it match new lines.
+    // Text between min and max characters
     function validText(s, min, max) {
       return s is string && s.matches('(?s).{' + string(min) + ',' + string(max) + '}');
     }
 
-    // safeName in src/validation/recipeSchema.ts: NAME_PATTERN in src/validation/patterns.ts.
+    // A name with safe characters only
     function validName(s, max) {
       return validText(s, 1, max) && s.matches("^[\\p{L}\\p{M}\\p{N} .,'’&()\\-!/%+]+$");
     }
 
+    // A whole number between min and max
     function validInt(n, min, max) {
       return n is int && n >= min && n <= max;
     }
 
+    // A list with min to max items
     function validList(values, min, max) {
       return values is list && values.size() >= min && values.size() <= max;
     }
 
-    // dietaryRestrictionsSchema in src/validation/profileSchema.ts.
-    // null = "not set yet". Empty lists = the user chose "none".
+    // Allergies and diets, or null if not set yet
     function validRestrictions(r) {
       return r == null || (
         r is map
@@ -113,7 +98,7 @@ service cloud.firestore {
       );
     }
 
-    // storedProfileSchema in src/validation/profileSchema.ts. No email or password.
+    // Profile fields (no email or password)
     function validProfile(p) {
       return p.keys().hasOnly(['username', 'dietaryRestrictions', 'createdAt', 'updatedAt', 'schemaVersion'])
         && p.keys().hasAll(['username', 'dietaryRestrictions', 'createdAt', 'updatedAt', 'schemaVersion'])
@@ -125,22 +110,18 @@ service cloud.firestore {
         && p.schemaVersion == 1;
     }
 
-    // Last edit wins (N-19): an update cannot be older than the stored copy, so a device
-    // that syncs late cannot overwrite a newer edit. Equal is allowed (a retried write,
-    // or an update that leaves updatedAt as it is).
+    // Last edit wins: an older edit can't replace a newer one
     function notStale() {
       return request.resource.data.updatedAt >= resource.data.updatedAt;
     }
 
-    // Does uid hold usernames/{name} once this write is done?
+    // Does this user hold this username after the write?
     function nameHeldBy(name, uid) {
       let path = /databases/$(database)/documents/usernames/$(name);
       return existsAfter(path) && getAfter(path).data.uid == uid;
     }
 
-    // The fields every synced record has besides its data (the Recipe and MealPlanEntry
-    // types). The id is the document ID, not a field. schemaVersion: SCHEMA_VERSION in
-    // the repositories.
+    // Dates and version every saved record needs
     function validRecordFields(d) {
       return validTimestamp(d.createdAt)
         && validTimestamp(d.updatedAt)
@@ -149,8 +130,7 @@ service cloud.firestore {
         && d.schemaVersion == 1;
     }
 
-    // What an update cannot change: createdAt, and a soft delete. Once deletedAt is set
-    // it stays, so a sync cannot bring a deleted record back.
+    // createdAt never changes, and a deleted record stays deleted
     function keepsRecordFields() {
       let before = resource.data;
       let after = request.resource.data;
@@ -158,9 +138,7 @@ service cloud.firestore {
         && (!('deletedAt' in before) || after.get('deletedAt', null) == before.deletedAt);
     }
 
-    // recipeSchema in src/validation/recipeSchema.ts, plus the record fields (Recipe type).
-    // allergens is in the data model (computed from the ingredients) but not in
-    // recipeSchema yet, so it is optional here.
+    // Recipe fields and limits
     function validRecipe(r) {
       let required = ['title', 'servings', 'mealTypes', 'ingredients', 'steps', 'dietTags',
                       'createdAt', 'updatedAt', 'schemaVersion'];
@@ -182,8 +160,7 @@ service cloud.firestore {
         && validRecordFields(r);
     }
 
-    // isRealDate in src/validation/mealPlanSchema.ts: "2026-02-30" matches the pattern
-    // but is not a real day.
+    // A day that exists (no 30 February)
     function isRealDate(key) {
       let parts = key.split('-');
       let year = int(parts[0]);
@@ -194,8 +171,7 @@ service cloud.firestore {
       return month >= 1 && month <= 12 && day >= 1 && day <= monthLengths[month - 1];
     }
 
-    // dateKeySchema in src/validation/mealPlanSchema.ts: "YYYY-MM-DD" (ASCII digits),
-    // MIN_DATE_KEY to MAX_DATE_KEY. Keys compare correctly as strings.
+    // Date as YYYY-MM-DD, 2000 to 2100
     function validDateKey(key) {
       return key is string
         && key.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
@@ -204,8 +180,7 @@ service cloud.firestore {
         && isRealDate(key);
     }
 
-    // mealPlanEntrySchema in src/validation/mealPlanSchema.ts, plus the record fields
-    // (MealPlanEntry type).
+    // Meal plan entry fields and limits
     function validMealPlanEntry(e) {
       let required = ['date', 'mealType', 'recipeId', 'servings', 'createdAt', 'updatedAt',
                       'schemaVersion'];
@@ -218,35 +193,30 @@ service cloud.firestore {
         && validRecordFields(e);
     }
 
+    // User profiles
     match /users/{uid} {
+      // Only the owner can read their profile
       allow get: if isOwner(uid);
 
-      // UsernameRegistry.claim: the profile and usernames/{name} are written in one
-      // batch. The new profile must point at a username claimed for this user.
+      // Created together with the username
       allow create: if isOwner(uid)
         && validProfile(request.resource.data)
         && request.resource.data.dietaryRestrictions == null
         && request.resource.data.updatedAt == request.resource.data.createdAt
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
 
-      // Dietary restrictions (N-18) and sync. The username and createdAt never change.
+      // Username and createdAt never change
       allow update: if isOwner(uid)
         && validProfile(request.resource.data)
         && notStale()
         && request.resource.data.username == resource.data.username
         && request.resource.data.createdAt == resource.data.createdAt;
 
-      // Account deletion (N-17). Only once the user no longer holds the username, or a
-      // user could delete the profile, claim another name, and repeat (one account
-      // holding many names). AccountDeleter releases the name first, and either order
-      // in one batch works. Deleting a profile that is already gone, or whose name
-      // someone else has claimed since, is allowed, so a deletion can be retried.
+      // Delete only after the username is released
       allow delete: if isOwner(uid)
         && (resource == null || !nameHeldBy(resource.data.username, uid));
 
-      // Synced content (N-19): only these two collections, only the owner. Anything
-      // else under users/{uid} is blocked. Delete has no ID check, so the owner can
-      // always remove a document.
+      // The user's recipes: owner only
       match /recipes/{recipeId} {
         allow read, delete: if isOwner(uid);
         allow create: if isOwner(uid)
@@ -259,13 +229,12 @@ service cloud.firestore {
           && keepsRecordFields();
       }
 
+      // The user's meal plan: owner only, the recipe can't change
       match /mealPlanEntries/{entryId} {
         allow read, delete: if isOwner(uid);
         allow create: if isOwner(uid)
           && validId(entryId)
           && validMealPlanEntry(request.resource.data);
-        // mealPlanEntryUpdateSchema: an entry can move or change servings, but its
-        // recipe cannot change.
         allow update: if isOwner(uid)
           && validId(entryId)
           && validMealPlanEntry(request.resource.data)
@@ -275,14 +244,12 @@ service cloud.firestore {
       }
     }
 
+    // Usernames: one owner each
     match /usernames/{username} {
-      // UsernameRegistry.isAvailable: anyone may look up one name.
-      // Nobody can list them all.
+      // Anyone can check one name, nobody can list them all
       allow get: if true;
 
-      // UsernameRegistry.claim. "create" fails if the name already exists, so each
-      // name has one owner. The profile in the same batch must use this name, and a
-      // user who already has a profile cannot claim a second name.
+      // Only if the name is free, one name per user
       allow create: if signedIn()
         && validUsername(username)
         && request.resource.data.keys().hasOnly(['uid'])
@@ -290,15 +257,12 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
 
-      // UsernameRegistry.release: only the owner. Releasing a name that is already
-      // free succeeds, so a half-finished account deletion can be retried.
+      // Only the owner can release it
       allow delete: if signedIn()
         && (resource == null || resource.data.uid == request.auth.uid);
     }
 
-    // Shared ingredient data. Signed-in users can read it (least privilege).
-    // Nobody can change it from the app. scripts/importIngredients.ts uses an
-    // admin key, which skips these rules.
+    // Ingredients: signed-in users can read, nobody can change them from the app
     match /ingredients/{ingredientId} {
       allow read: if signedIn();
       allow write: if false;
