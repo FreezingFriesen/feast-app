@@ -8,8 +8,10 @@ import { TextAction } from "./TextAction";
 // Session info (N-15) and changing the password.
 export function SecuritySection() {
   const router = useRouter();
+  // The latest 30-day session check (null until the first one finishes).
   const session = useSessionStatus();
 
+  // The "Signed in until …" date shows only while the session is active.
   return (
     <AccountSection title="Sign-in and security">
       {session?.state === "active" ? (

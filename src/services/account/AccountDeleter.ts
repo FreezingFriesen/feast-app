@@ -21,6 +21,7 @@ export type AccountDeletionStep =
   | "delete_auth_user"
   | "wipe_local";
 
+// Either everything was deleted, or which step stopped it and why.
 export type AccountDeletionResult =
   | { ok: true }
   | { ok: false; failedStep: AccountDeletionStep; error: DomainErrorCode };
@@ -32,6 +33,8 @@ export type AccountDeleter = {
   deleteAccount(input: unknown): Promise<AccountDeletionResult>;
 };
 
+// Everything deletion touches: the login, the username, the server copies, the
+// phone's copy, the 30-day session and the phone's local data.
 type AccountDeleterDependencies = {
   auth: AuthService;
   usernames: UsernameRegistry;
@@ -42,6 +45,7 @@ type AccountDeleterDependencies = {
   localData: LocalDataWiper;
 };
 
+// Creates an account deleter that runs the steps in order, and returns the step that failed if any.
 export function createAccountDeleter({
   auth,
   usernames,
@@ -53,6 +57,8 @@ export function createAccountDeleter({
 }: AccountDeleterDependencies): AccountDeleter {
   return {
     async deleteAccount(input) {
+      // "step" is moved forward before each step starts, so a failure (returned or
+      // thrown) always reports the step it happened in.
       let step: AccountDeletionStep = "confirm";
       const failAt = (error: DomainErrorCode): AccountDeletionResult => ({ ok: false, failedStep: step, error });
 
@@ -66,10 +72,12 @@ export function createAccountDeleter({
         const local = await profiles.get(user.uid);
         if (!local || parsed.data.confirmation !== local.username) return failAt("invalid_input");
 
+        // Prove it's really the user, right before anything is deleted.
         step = "reauthenticate";
         const reauth = await auth.reauthenticate({ password: parsed.data.password });
         if (!reauth.ok) return failAt(reauth.error);
 
+        // The user's recipes and meal plans on the server.
         step = "delete_data";
         const content = await remoteContent.deleteAll(user.uid);
         if (!content.ok) return failAt(content.reason);
@@ -83,10 +91,12 @@ export function createAccountDeleter({
         // not_owner: someone else holds the name now, so ours was already released.
         if (!released.ok && released.reason !== "not_owner") return failAt(released.reason);
 
+        // The users/{uid} profile on the server.
         step = "delete_profile";
         const profileDeleted = await remoteProfiles.delete(user.uid);
         if (!profileDeleted.ok) return failAt(profileDeleted.reason);
 
+        // The login itself. After this the user is signed out.
         step = "delete_auth_user";
         const authDeleted = await auth.deleteAuthUser();
         if (!authDeleted.ok) return failAt(authDeleted.error);
@@ -97,6 +107,7 @@ export function createAccountDeleter({
         await localData.wipe();
         return { ok: true };
       } catch (error) {
+        // Anything thrown is reported against the step that was running.
         return failAt(isDomainError(error) ? error.code : "unknown");
       }
     },

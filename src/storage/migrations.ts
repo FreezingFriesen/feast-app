@@ -21,8 +21,11 @@ export const MIGRATIONS: readonly string[] = [
 
 // Brings the database up to the latest version. Safe to run on every app start.
 export async function runMigrations(db: SqlDatabase): Promise<void> {
+  // SQLite keeps the database's version number in user_version (0 for a new database).
   const row = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version", []);
   const current = row?.user_version ?? 0;
+  // Run every migration the database hasn't had yet, oldest first. If one fails,
+  // undo it and stop, so the database is never left half changed.
   for (let version = current; version < MIGRATIONS.length; version += 1) {
     try {
       await db.execAsync(MIGRATIONS[version]);

@@ -1,9 +1,12 @@
 import type { SyncStatus } from "@/services/sync/SyncService";
 
+// A summary of the sync status, for display in the account screen. It includes a headline, a detail message, and a tone (muted or error).
 export type SyncSummary = { headline: string; detail: string | null; tone: "muted" | "error" };
 
+// A helper function to format the number of pending changes for display. It returns "1 change" for one change, and "N changes" for N changes.
 const changesText = (count: number) => (count === 1 ? "1 change" : `${count} changes`);
 
+// Format a timestamp for display in the sync section. Uses the user's locale and shows the month, day, hour, and minute.
 export function formatSyncTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, {
     month: "short",
@@ -53,6 +56,7 @@ export function syncSummary(status: SyncStatus, online: boolean | null): SyncSum
   };
 }
 
+// Can the user sync now? They can if they're online and the sync engine is available and not already syncing.
 export function canSyncNow(status: SyncStatus, online: boolean | null): boolean {
   return online !== false && status.state !== "unavailable" && status.state !== "syncing";
 }

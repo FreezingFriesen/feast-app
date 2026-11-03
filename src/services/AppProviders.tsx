@@ -9,11 +9,15 @@ import { isDomainError } from "./domainErrors";
 import { ServiceProvider } from "./ServiceProvider";
 import { expoSecureKeyValue } from "./session/expoSecureKeyValue";
 
+// Where startup has got to. noBackend: the failure was a missing or refused backend
+// setting, which gets its own message.
 type Startup =
   | { status: "loading" }
   | { status: "ready"; app: AppServices }
   | { status: "failed"; noBackend: boolean };
 
+// Everything that has to happen before the first screen: pick the backend, open the
+// database on the phone, build the services, and restore a saved login.
 async function startApp(): Promise<AppServices> {
   // Read here and nowhere else. EXPO_PUBLIC_ values are inlined at build time, so the
   // variable has to be written out in full.
@@ -36,6 +40,8 @@ async function startApp(): Promise<AppServices> {
 export function AppProviders({ children }: { children: ReactNode }) {
   const [startup, setStartup] = useState<Startup>({ status: "loading" });
 
+  // Start the app once, when this first appears. "active" ignores the result if it
+  // goes away before startup finishes.
   useEffect(() => {
     let active = true;
     startApp().then(
@@ -53,6 +59,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Nothing is drawn while starting. If startup failed, show why instead of the app.
   if (startup.status === "loading") return null;
   if (startup.status === "failed") {
     return startup.noBackend ? (
@@ -69,6 +76,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
     );
   }
 
+  // Ready: share the repositories and services with every screen, and start the
+  // 30-day session check.
   return (
     <RepositoryProvider repositories={startup.app.repositories}>
       <ServiceProvider services={startup.app.services}>

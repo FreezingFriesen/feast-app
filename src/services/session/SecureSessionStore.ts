@@ -15,9 +15,12 @@ export type SecureSessionStore = {
   clear(): Promise<void>;
 };
 
+// The secure storage keys. The auth session is split over several keys that all
+// start with the prefix (see chunkedSecureStorage.ts).
 const LOGIN_AT_KEY = "feast.session.loginAt";
 const AUTH_STORAGE_PREFIX = "feast.session.auth";
 
+// Built on the secure key-value store passed in (expo-secure-store in the app).
 export function createSecureSessionStore(secure: SecureKeyValueStore): SecureSessionStore {
   const authStorage = createChunkedSecureStorage(secure, AUTH_STORAGE_PREFIX);
 
@@ -34,6 +37,7 @@ export function createSecureSessionStore(secure: SecureKeyValueStore): SecureSes
       }
     },
 
+    // Saved as text, because secure storage only holds strings.
     async setLoginAt(timestamp) {
       const result = timestampSchema.safeParse(timestamp);
       if (!result.success) {

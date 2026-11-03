@@ -1,6 +1,7 @@
 import type { StoredProfile } from "@/repositories/ProfileRepository";
 import type { DomainErrorCode } from "@/services/domainErrors";
 
+// The ways a server call can fail: no connection, not your data, a bad ID, or anything else.
 type RemoteErrorCode = Extract<DomainErrorCode, "offline" | "not_owner" | "invalid_input" | "unknown">;
 
 export type RemoteProfileResult =
@@ -8,6 +9,7 @@ export type RemoteProfileResult =
   | { ok: true; profile: StoredProfile | null }
   | { ok: false; reason: RemoteErrorCode };
 
+// Deleted (or already gone), or why it couldn't be deleted.
 export type RemoteDeleteResult = { ok: true } | { ok: false; reason: RemoteErrorCode };
 
 // The signed-in user's users/{uid} document on the backend, e.g. read after logging in

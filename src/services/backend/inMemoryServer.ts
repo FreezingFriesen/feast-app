@@ -22,6 +22,8 @@ export type InMemoryOperation =
   | "content.deleteAll";
 
 // Firebase-like limits the fake also enforces.
+// A sensitive change needs a login in the last 5 minutes; 5 wrong passwords lock
+// sign in until a minute has passed since the last wrong one.
 export const RECENT_LOGIN_MS = 5 * 60 * 1000;
 export const MAX_FAILED_SIGN_INS = 5;
 export const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -36,6 +38,7 @@ export type InMemoryAccount = {
   lastAuthAt: number;
 };
 
+// Everything the pretend server stores, laid out like the Firestore collections.
 export type InMemoryServerState = {
   accounts: Map<string, InMemoryAccount>; // by lowercased email
   usernames: Map<string, string>; // usernames/{name} -> uid
@@ -49,6 +52,7 @@ export type InMemoryServerControls = {
   setOffline(offline: boolean): void;
   // The next `times` calls of `operation` fail with `code`.
   failNext(operation: InMemoryOperation, code?: DomainErrorCode, times?: number): void;
+  // Cancels every failure set up with failNext.
   clearFailures(): void;
   // Moves the server clock forward (e.g. past the recent-login window).
   advanceClock(ms: number): void;
@@ -68,6 +72,7 @@ export type InMemoryServer = {
   // Several writes applied together, like a Firestore batch: they go to copies of the
   // state, which replace it only if nothing fails before the commit.
   transaction(commitPoint: InMemoryOperation, write: (draft: InMemoryServerState) => void): void;
+  // The wrong-password lock: check it, count a wrong password, or reset after a right one.
   isRateLimited(email: string): boolean;
   recordFailedSignIn(email: string): void;
   clearFailedSignIns(email: string): void;
@@ -76,6 +81,8 @@ export type InMemoryServer = {
   controls: InMemoryServerControls;
 };
 
+// connectivity: the phone's real network status. latencyMs: a pretend network delay.
+// now: the clock, so tests can control time.
 type InMemoryServerOptions = {
   connectivity: ConnectivityService;
   latencyMs?: number;
@@ -93,14 +100,19 @@ export function createInMemoryServer({
     users: new Map(),
     userContent: new Map(),
   };
+  // The dev controls: the offline switch and how far the clock has been moved forward.
   let offline = false;
   let clockOffset = 0;
+  // Failures set up with failNext, and how many more times each one should happen.
   const failures = new Map<InMemoryOperation, { code: DomainErrorCode; remaining: number }>();
+  // Wrong passwords per email, for the sign in lock.
   const failedSignIns = new Map<string, { count: number; lastFailureAt: number }>();
   const accountListeners = new Set<(uid: string) => void>();
 
+  // The server's time: the real clock plus any advanceClock() moves.
   const serverNow = () => now() + clockOffset;
 
+  // If a failure was set up for this operation, use up one and throw it.
   function takeInjectedFailure(operation: InMemoryOperation) {
     const failure = failures.get(operation);
     if (!failure) return;
@@ -127,6 +139,8 @@ export function createInMemoryServer({
       return call();
     },
 
+    // Copy the state, apply the writes to the copy, then swap it in. If a failure is
+    // injected at the commit point, the copy is thrown away and nothing changes.
     transaction(commitPoint, write) {
       const draft: InMemoryServerState = {
         accounts: new Map(state.accounts),
@@ -139,6 +153,8 @@ export function createInMemoryServer({
       state = draft;
     },
 
+    // Locked after MAX_FAILED_SIGN_INS wrong passwords; the count resets once the
+    // window has passed since the last wrong one.
     isRateLimited(email) {
       const entry = failedSignIns.get(email);
       if (!entry) return false;

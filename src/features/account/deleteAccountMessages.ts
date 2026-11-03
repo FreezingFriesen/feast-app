@@ -2,6 +2,7 @@ import type { AccountDeletionResult } from "@/services/account/AccountDeleter";
 import { deleteAccountSchema } from "@/validation/authSchema";
 import { accountErrorMessage } from "./accountMessages";
 
+// A deletion result that didn't work: which step failed and why.
 type DeletionFailure = Extract<AccountDeletionResult, { ok: false }>;
 
 // What deleting the account removes (N-17), shown before the user confirms.
@@ -35,6 +36,7 @@ export type DeletionFailureView = {
 export function deletionFailureView(result: DeletionFailure): DeletionFailureView {
   const { failedStep, error } = result;
 
+  // The username or password was wrong: nothing was deleted, so mark the box to fix.
   if (failedStep === "confirm") {
     return error === "invalid_input"
       ? { message: "That doesn't match your username.", field: "confirmation", retry: null }
@@ -52,6 +54,7 @@ export function deletionFailureView(result: DeletionFailure): DeletionFailureVie
       retry: "wipe_local",
     };
   }
+  // Any other step: part of the account may be gone already, and "Try again" finishes it.
   const why = error === "offline" ? "You're offline." : "Something went wrong.";
   return {
     message: `${why} Your account was only partly deleted. Try again to finish deleting it.`,

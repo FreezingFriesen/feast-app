@@ -13,6 +13,7 @@ type UsernameFieldProps = {
 
 // Username input with a live availability check underneath (N-13).
 export function UsernameField({ value, onChangeText, error, editable }: UsernameFieldProps) {
+  // The hint under the box, e.g. "Checking availability…", "✓ Available" or "That username is taken".
   const status = usernameCheckMessage(useUsernameAvailability(value));
   return (
     <View>
@@ -30,6 +31,8 @@ export function UsernameField({ value, onChangeText, error, editable }: Username
         textContentType="nickname"
         returnKeyType="next"
       />
+      {/* The hint is hidden while the form shows an error for this box, so only one
+          message is under it at a time. */}
       {error ? null : (
         <Text style={[styles.status, toneStyles[status.tone]]} accessibilityLiveRegion="polite">
           {status.text}
@@ -39,6 +42,7 @@ export function UsernameField({ value, onChangeText, error, editable }: Username
   );
 }
 
+// The negative margin pulls the hint up under the box, into the field's bottom spacing.
 const styles = StyleSheet.create({
   status: {
     fontSize: 13,

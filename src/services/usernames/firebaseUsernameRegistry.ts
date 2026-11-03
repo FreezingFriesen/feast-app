@@ -1,6 +1,7 @@
 import { domainError } from "@/services/domainErrors";
 import type { UsernameRegistry } from "./UsernameRegistry";
 
+// Every method below calls this, which always throws.
 const notConfigured = (): never => {
   throw domainError("backend_not_configured");
 };

@@ -3,6 +3,8 @@ import { UID_PATTERN } from "@/validation/patterns";
 import { dietaryRestrictionsSchema, storedProfileSchema } from "@/validation/profileSchema";
 import type { Profile, ProfileRepository } from "./ProfileRepository";
 
+// One row of the profiles table, as SQLite returns it. The restrictions are stored
+// as JSON text (or NULL for "not set yet").
 type ProfileRow = {
   uid: string;
   username: string;
@@ -54,6 +56,7 @@ function toProfile(row: ProfileRow | null): Profile | undefined {
   return result.success ? { ...result.data, uid: row.uid } : undefined;
 }
 
+// The restrictions as the text saved in the column: JSON, or NULL for "not set yet".
 const restrictionsColumn = (profile: Profile) =>
   profile.dietaryRestrictions === null ? null : JSON.stringify(profile.dietaryRestrictions);
 
@@ -63,9 +66,11 @@ export function createSqliteProfileRepository(
   db: SqlDatabase,
   now: () => number = Date.now,
 ): ProfileRepository {
+  // The screens to tell when something changes (see subscribe below).
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());
 
+  // Reads one profile. An invalid ID never reaches the database.
   async function get(uid: string): Promise<Profile | undefined> {
     if (!UID_PATTERN.test(uid)) return undefined;
     return toProfile(await db.getFirstAsync<ProfileRow>(SELECT_PROFILE, [uid]));
@@ -108,6 +113,7 @@ export function createSqliteProfileRepository(
       if (!result.success) return "invalid";
 
       // On a tie the local copy stays, so downloading our own upload again never replaces it.
+      // "changes" is how many rows SQLite wrote: 0 means the local copy was kept.
       const profile: Profile = { ...result.data, uid };
       const { changes } = await db.runAsync(UPSERT_IF_NEWER, [
         uid,
@@ -127,6 +133,7 @@ export function createSqliteProfileRepository(
       notify();
     },
 
+    // Screens call this to hear about changes. The function it returns stops listening.
     subscribe(listener) {
       listeners.add(listener);
       return () => {

@@ -21,6 +21,7 @@ import {
   type AuthUserResult,
 } from "./AuthService";
 
+// The characters a made-up user ID can contain.
 const UID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 // 28 letters and digits, like a Firebase uid (matches UID_PATTERN).
@@ -32,6 +33,7 @@ function newUid(): string {
   return uid;
 }
 
+// Shorthands for failed results.
 const fail = (error: AuthErrorCode) => ({ ok: false, error }) as const;
 const INVALID_INPUT = fail("invalid_input");
 const INVALID_CREDENTIALS = fail("invalid_credentials");
@@ -39,6 +41,7 @@ const INVALID_CREDENTIALS = fail("invalid_credentials");
 // Development backend: behaves like Firebase Auth closely enough to build and test the
 // Account screens. Nothing survives a reload. Refused in production (createAppServices).
 export function createInMemoryAuthService(server: InMemoryServer): AuthService {
+  // Who to tell when the user signs in or out, and who is signed in now.
   const listeners = new Set<(user: AuthUser | null) => void>();
   let current: AuthUser | null = null;
 
@@ -49,15 +52,19 @@ export function createInMemoryAuthService(server: InMemoryServer): AuthService {
     listeners.forEach((listener) => listener(current));
   }
 
+  // When the server changes the signed-in account (e.g. its email is verified),
+  // refresh the user the screens see.
   server.onAccountChange((uid) => {
     const account = signedInAccount();
     if (account && account.uid === uid) setCurrent(account);
   });
 
+  // The server's record for the signed-in user, or undefined if nobody is signed in.
   function signedInAccount(): InMemoryAccount | undefined {
     return current?.email ? server.state.accounts.get(current.email) : undefined;
   }
 
+  // Did the user log in (or re-enter their password) recently enough for a sensitive change?
   const isRecent = (account: InMemoryAccount) => server.now() - account.lastAuthAt <= RECENT_LOGIN_MS;
 
   // Runs a server call. Expected failures (offline, injected errors) become results.
@@ -113,6 +120,7 @@ export function createInMemoryAuthService(server: InMemoryServer): AuthService {
       const { email, password } = parsed.data;
 
       return call("auth.signIn", (): AuthUserResult => {
+        // Too many wrong passwords in a row: refuse for a while, like Firebase does.
         if (server.isRateLimited(email)) return fail("rate_limited");
         const account = server.state.accounts.get(email);
         // Unknown email and wrong password give the same result.
@@ -127,6 +135,7 @@ export function createInMemoryAuthService(server: InMemoryServer): AuthService {
       });
     },
 
+    // Signing out never needs the network.
     signOut: () =>
       withDomainErrors(() => server.run("auth.signOut", () => setCurrent(null), { needsNetwork: false })),
 
@@ -140,6 +149,7 @@ export function createInMemoryAuthService(server: InMemoryServer): AuthService {
       const parsed = reauthSchema.safeParse(input);
       if (!parsed.success) return INVALID_INPUT;
 
+      // Checks the password again and resets the "recent login" clock.
       return call("auth.reauthenticate", (): AuthResult => {
         const account = signedInAccount();
         if (!account) return fail("requires_recent_login");
@@ -158,6 +168,7 @@ export function createInMemoryAuthService(server: InMemoryServer): AuthService {
       const parsed = newPasswordSchema.safeParse(input);
       if (!parsed.success) return INVALID_INPUT;
 
+      // Like Firebase, refused unless the user logged in recently.
       return call("auth.changePassword", (): AuthResult => {
         const account = signedInAccount();
         if (!account || !isRecent(account)) return fail("requires_recent_login");
@@ -178,6 +189,7 @@ export function createInMemoryAuthService(server: InMemoryServer): AuthService {
       });
     },
 
+    // Nothing is actually sent; it only checks someone is signed in.
     async sendVerificationEmail() {
       return call("auth.sendVerificationEmail", (): AuthResult =>
         signedInAccount() ? { ok: true } : fail("requires_recent_login"),

@@ -8,6 +8,9 @@ export function useMealPlanEntries(startDate: DateKey, endDate: DateKey): MealPl
   const repository = useMealPlanRepository();
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
 
+  // The entries are reloaded after every change. The repository is subscribed to, so that the entries are updated when the repository changes.
+  // It also reloads when the date range changes. If this is cleaned up before a load
+  // finishes, "active" is false and that result is ignored.
   useEffect(() => {
     let active = true;
     const load = () => {

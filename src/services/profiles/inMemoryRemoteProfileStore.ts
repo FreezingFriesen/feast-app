@@ -4,6 +4,7 @@ import { uidSchema } from "@/validation/authSchema";
 import { storedProfileSchema } from "@/validation/profileSchema";
 import type { RemoteDeleteResult, RemoteProfileResult, RemoteProfileStore } from "./RemoteProfileStore";
 
+// The only error code passed on as-is. Anything else becomes "unknown".
 const REMOTE_ERRORS = ["offline"] as const;
 
 // Development backend: users/{uid} on the in-memory server.
@@ -17,6 +18,7 @@ export function createInMemoryRemoteProfileStore(server: InMemoryServer): Remote
           if (server.signedInUid !== uid) return { ok: false, reason: "not_owner" };
           const stored = server.state.users.get(uid);
           if (stored === undefined) return { ok: true, profile: null };
+          // Downloaded data is untrusted, so check it before handing it back.
           const parsed = storedProfileSchema.safeParse(stored);
           return parsed.success ? { ok: true, profile: parsed.data } : { ok: false, reason: "unknown" };
         });
@@ -29,6 +31,7 @@ export function createInMemoryRemoteProfileStore(server: InMemoryServer): Remote
       if (!uidSchema.safeParse(uid).success) return { ok: false, reason: "invalid_input" };
       try {
         return await server.run("profiles.delete", (): RemoteDeleteResult => {
+          // Only your own document. Deleting one that's already gone still succeeds.
           if (server.signedInUid !== uid) return { ok: false, reason: "not_owner" };
           server.state.users.delete(uid);
           return { ok: true };

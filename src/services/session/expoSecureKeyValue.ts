@@ -8,6 +8,7 @@ const options: SecureStore.SecureStoreOptions = {
 };
 
 // expo-secure-store is bundled in Expo Go. Not available on web.
+// Uses the iOS Keychain and Android Keystore, which encrypt what's stored.
 export const expoSecureKeyValue: SecureKeyValueStore = {
   getItemAsync: (key) => SecureStore.getItemAsync(key, options),
   setItemAsync: (key, value) => SecureStore.setItemAsync(key, value, options),

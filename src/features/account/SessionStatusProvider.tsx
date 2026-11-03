@@ -2,6 +2,8 @@ import type { SessionCheck } from "@/services/session/sessionGuard";
 import { createContext, useContext, type ReactNode } from "react";
 import { useSessionCheck } from "./useSessionCheck";
 
+// Shares the latest check with every screen below the provider, without passing it
+// down by hand.
 const SessionStatusContext = createContext<SessionCheck | null>(null);
 
 // Runs the 30-day session check (N-15) once for the whole app, so it also happens

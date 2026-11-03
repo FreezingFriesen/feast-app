@@ -1,6 +1,6 @@
 // This screen allows the user to create a new recipe by filling out a form with various fields 
 // such as title, description, ingredients, steps, and diet tags. 
-// The form is validated before submission, and any errors are displayed to the user.
+// The form is validated before submission, and any errors are displayed to the user (N-01).
 import { ChipSelect } from "@/components/form/ChipSelect";
 import { issuesToFieldErrors, type FieldErrors } from "@/components/form/fieldErrors";
 import { FieldError, FormField } from "@/components/form/FormField";
@@ -29,6 +29,7 @@ import {
 } from "react-native";
 
 // A utility function that toggles the presence of a value in a list.
+// Adds it if it's missing, removes it if it's there. Used by the chip pickers.
 function toggle<T>(list: readonly T[], value: T): T[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
@@ -37,9 +38,13 @@ function toggle<T>(list: readonly T[], value: T): T[] {
 // and submits the recipe to the repository when the user saves it.
 export default function NewRecipeScreen() {
   const router = useRouter();
+  // Where recipes are saved. The screen never talks to the database directly.
   const recipes = useRecipeRepository();
+  // Everything typed into the form, kept as text exactly as typed.
   const [values, setValues] = useState<RecipeFormValues>(emptyRecipeForm);
+  // Error message for each field that failed validation, keyed by field name.
   const [errors, setErrors] = useState<FieldErrors>({});
+  // True while the recipe is being saved, so the save button can't be pressed twice.
   const [saving, setSaving] = useState(false);
 
   // A helper function that updates a specific field in the form values state.
@@ -66,6 +71,7 @@ export default function NewRecipeScreen() {
   // The handleSave function validates the form values and submits the new recipe to the repository.
   async function handleSave() {
     // Form-level check for instant feedback; the repository validates again before writing.
+    // toRecipeInput turns the typed text into numbers and drops the React row keys.
     const input = toRecipeInput(values);
     const parsed = recipeSchema.safeParse(input);
     if (!parsed.success) {
@@ -74,6 +80,8 @@ export default function NewRecipeScreen() {
     }
 
     // If validation passes, attempt to create the recipe in the repository and handle any errors.
+    // Save parsed.data (the cleaned version), not the raw form values.
+    // On success, go back to the recipe list.
     setSaving(true);
     try {
       const result = await recipes.create(parsed.data);
@@ -83,6 +91,7 @@ export default function NewRecipeScreen() {
       }
       router.back();
     } finally {
+      // Runs whether the save worked or not, so the button is never stuck on "Saving…".
       setSaving(false);
     }
   }
@@ -94,12 +103,17 @@ export default function NewRecipeScreen() {
   // meal types, ingredients, steps, diet tags, and notes. The form includes buttons for adding/removing ingredients
   // and steps, and a save button that triggers the handleSave function.
   return (
+    // KeyboardAvoidingView moves the form up on iOS so the keyboard doesn't cover the
+    // field being typed in. Android does this by itself.
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={100}
     >
+      {/* keyboardShouldPersistTaps lets a button be tapped while the keyboard is open. */}
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {/* Each FormField shows its label, the text box, and its error message (if any).
+            maxLength stops typing past the limit the schema allows. */}
         <FormField
           label="Title"
           value={values.title}
@@ -118,6 +132,7 @@ export default function NewRecipeScreen() {
           error={errors.description}
         />
 
+        {/* Servings, prep time and cook time side by side, with a number keyboard. */}
         <View style={styles.row}>
           <FormField
             label="Servings"
@@ -145,6 +160,8 @@ export default function NewRecipeScreen() {
           />
         </View>
 
+        {/* Meal types: tap to pick any of Breakfast, Lunch, Dinner, Snack. The meal
+            planner lists recipes tagged with a slot's meal type first. */}
         <Text style={styles.sectionTitle}>Meal types</Text>
         <ChipSelect
           options={MEAL_TYPES}
@@ -153,6 +170,9 @@ export default function NewRecipeScreen() {
         />
         {errors.mealTypes ? <FieldError message={errors.mealTypes} /> : null}
 
+        {/* Ingredients: one card per row, with a name, a quantity and a unit.
+            row.key is a stable ID for React, so typing stays in the right row when one
+            is removed. Errors are keyed by position, e.g. "ingredients.0.name". */}
         <Text style={styles.sectionTitle}>Ingredients</Text>
         {values.ingredients.map((row, index) => (
           <View key={row.key} style={styles.card}>
@@ -177,6 +197,7 @@ export default function NewRecipeScreen() {
                 style={styles.qtyInput}
               />
             </View>
+            {/* One unit per ingredient. Tapping the selected unit again clears it. */}
             <ChipSelect
               options={UNITS}
               selected={row.unit === "" ? [] : [row.unit]}
@@ -186,6 +207,7 @@ export default function NewRecipeScreen() {
             {errors[`ingredients.${index}.unit`] ? (
               <FieldError message={errors[`ingredients.${index}.unit`]} />
             ) : null}
+            {/* A recipe needs at least one ingredient, so the last row can't be removed. */}
             {values.ingredients.length > 1 ? (
               <Pressable
                 onPress={() =>
@@ -202,6 +224,7 @@ export default function NewRecipeScreen() {
           </View>
         ))}
         {errors.ingredients ? <FieldError message={errors.ingredients} /> : null}
+        {/* The "Add" button disappears once the maximum number of rows is reached. */}
         {values.ingredients.length < MAX_INGREDIENT_ROWS ? (
           <Pressable
             onPress={() => setField("ingredients", [...values.ingredients, emptyIngredientRow()])}
@@ -211,6 +234,7 @@ export default function NewRecipeScreen() {
           </Pressable>
         ) : null}
 
+        {/* Steps: numbered text boxes, with the same add and remove rules as ingredients. */}
         <Text style={styles.sectionTitle}>Steps</Text>
         {values.steps.map((step, index) => (
           <View key={step.key} style={styles.stepRow}>
@@ -246,6 +270,7 @@ export default function NewRecipeScreen() {
           </Pressable>
         ) : null}
 
+        {/* Diet tags (#5): tap to pick any that apply, e.g. Vegan or Gluten free. */}
         <Text style={styles.sectionTitle}>Diet tags</Text>
         <ChipSelect
           options={DIET_TAGS}
@@ -265,6 +290,7 @@ export default function NewRecipeScreen() {
           error={errors.notes}
         />
 
+        {/* A reminder by the save button, since the errors may be scrolled out of view. */}
         {hasErrors ? <FieldError message="Please fix the highlighted fields." /> : null}
         <Pressable
           onPress={handleSave}

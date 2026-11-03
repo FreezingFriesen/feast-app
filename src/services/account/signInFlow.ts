@@ -15,6 +15,7 @@ import { signInSchema } from "@/validation/authSchema";
 // unavailable: no copy on the device and it couldn't be downloaded right now.
 export type ProfileState = "ready" | "needs_username" | "unavailable";
 
+// Signed in (and whether the profile is ready), or why it failed.
 export type SignInResult =
   | { status: "signed_in"; profile: ProfileState }
   | { status: "failed"; error: AuthErrorCode };
@@ -26,23 +27,31 @@ export type SignInFlow = {
   sendPasswordReset(input: unknown): Promise<AuthResult>;
 };
 
+// The phone's copy of the profile and the server's copy.
 type ProfileSources = { profiles: ProfileRepository; remoteProfiles: RemoteProfileStore };
 type SignInDependencies = ProfileSources & { auth: AuthService; sessionGuard: SessionGuard };
 
+// Shorthand for a failed sign in result.
 const failed = (error: AuthErrorCode) => ({ status: "failed", error }) as const;
 
 // Downloads the signed-in user's profile and keeps whichever copy is newer (last edit
 // wins). Restores the profile after logging in on a new device (#19).
 export async function refreshProfile({ profiles, remoteProfiles }: ProfileSources, uid: string): Promise<ProfileState> {
+  // Ask for both copies at the same time.
   const [remote, local] = await Promise.all([remoteProfiles.fetch(uid), profiles.get(uid)]);
+  // The server has one: merge it in (it replaces the phone's copy only if newer).
   if (remote.ok && remote.profile) {
     await profiles.mergeIncoming(uid, remote.profile);
     return "ready";
   }
+  // Couldn't download, but the phone has a copy: use that.
   if (local) return "ready";
+  // The server answered and has no profile: sign up stopped before the username was
+  // saved. Otherwise the download failed (e.g. offline).
   return remote.ok ? "needs_username" : "unavailable";
 }
 
+// Each method returns a result and never throws, so screens only check the status.
 export function createSignInFlow({ auth, sessionGuard, ...sources }: SignInDependencies): SignInFlow {
   return {
     async signIn(input) {
@@ -53,11 +62,14 @@ export function createSignInFlow({ auth, sessionGuard, ...sources }: SignInDepen
         // Before signing in: the app-wide session check runs as soon as the user appears.
         await sessionGuard.startSession();
         const result = await auth.signIn(parsed.data);
+        // Log in failed: throw away the session that was just started.
         if (!result.ok) {
           await sessionGuard.endSession().catch(() => {});
           return failed(result.error);
         }
 
+        // Logged in. A failed profile download doesn't undo the log in; the Account
+        // tab offers to try again.
         const profile = await refreshProfile(sources, result.user.uid).catch((): ProfileState => "unavailable");
         return { status: "signed_in", profile };
       } catch (error) {

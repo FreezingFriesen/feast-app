@@ -1,15 +1,18 @@
+// The Recipes tab: a list of the user's saved recipes (#1, N-01).
 import { useRecipes } from "@/features/recipes/useRecipes";
 import { Link, Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 // This screen displays a list of recipes and allows the user to navigate to the "New Recipe" screen.
 export default function RecipesScreen() {
+  // All saved recipes, newest first. The list updates by itself when a recipe is added.
   const recipes = useRecipes();
 
   // Render the list of recipes or a message indicating that there are no recipes yet.
   return (
     <>
-    {/* Add a header button to navigate to the "New Recipe" screen. */}
+      {/* Add a header button to navigate to the "New Recipe" screen. */}
+      {/* asChild makes the Pressable inside behave as the link, so it keeps its own look. */}
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -22,10 +25,14 @@ export default function RecipesScreen() {
         }}
       />
       {/* Render the list of recipes using a FlatList component. If there are no recipes, display a message and a button to create a new recipe. */}
+      {/* FlatList only draws the rows that are on screen, so long lists stay fast. */}
       <FlatList
         data={recipes}
+        // Each row needs a unique key so React can tell the rows apart.
         keyExtractor={(recipe) => recipe.id}
+        // With no recipes, the list stretches to full height so the message is centred.
         contentContainerStyle={recipes.length === 0 ? styles.emptyContainer : styles.list}
+        // Shown instead of the list when there are no recipes.
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No recipes yet</Text>

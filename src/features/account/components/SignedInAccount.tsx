@@ -14,6 +14,8 @@ type SignedInAccountProps = {
 };
 
 // The Account page for a signed-in user, built from one component per section.
+// Top to bottom: profile, dietary restrictions, sync, security, log out, then
+// delete account on its own at the bottom.
 export function SignedInAccount({ user, profile }: SignedInAccountProps) {
   return (
     <View style={styles.container}>

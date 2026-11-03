@@ -10,8 +10,11 @@ import {
 } from "../dates";
 
 type WeekStripProps = {
+  // The highlighted day. The strip shows the week it falls in.
   selectedKey: DateKey;
+  // A day or an arrow was tapped. Gets the newly selected day.
   onSelect: (key: DateKey) => void;
+  // Today's number is coloured blue.
   todayKey?: DateKey;
   // Shows a dot under days that have meals planned.
   hasMeals?: (key: DateKey) => boolean;
@@ -22,6 +25,7 @@ type WeekStripProps = {
 export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStripProps) {
   return (
     <View style={styles.container}>
+      {/* The top line: previous-week arrow, the week's dates, next-week arrow. */}
       <View style={styles.header}>
         <Pressable
           onPress={() => onSelect(addDays(selectedKey, -7))}
@@ -42,6 +46,8 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
         </Pressable>
       </View>
 
+      {/* Seven buttons, Monday to Sunday: the weekday, the day number, and a dot if
+          meals are planned. The selected day is filled blue. */}
       <View style={styles.days}>
         {weekDays(selectedKey).map((key) => {
           const isSelected = key === selectedKey;
@@ -67,6 +73,8 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
               >
                 {dayOfMonth(key)}
               </Text>
+              {/* The dot is always there (so the buttons stay the same height) but is
+                  only coloured when the day has meals. White on the selected day. */}
               <View
                 style={[
                   styles.dot,

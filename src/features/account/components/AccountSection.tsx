@@ -3,11 +3,13 @@ import { StyleSheet, Text, View } from "react-native";
 
 type AccountSectionProps = {
   title: string;
+  // Whatever goes inside the card, under the title.
   children: ReactNode;
 };
 
 // One titled card on the Account page (same card style as the recipe form).
 export function AccountSection({ title, children }: AccountSectionProps) {
+  // The title is marked as a heading, so screen reader users can jump between sections.
   return (
     <View style={styles.card}>
       <Text style={styles.title} accessibilityRole="header">

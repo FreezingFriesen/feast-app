@@ -7,12 +7,17 @@ import type { DaySlotEntries } from "../groupEntries";
 import { MEAL_TYPE_COLORS } from "../mealTypeColors";
 
 type DaySlotsProps = {
+  // The day's planned meals, split into breakfast, lunch and dinner.
   slots: DaySlotEntries;
+  // Used to show each meal's recipe name (a planned meal stores only the recipe's ID).
   recipesById: ReadonlyMap<string, Recipe>;
+  // "+ Add" was tapped in a slot.
   onAdd: (mealType: PlannerMealType) => void;
+  // A planned meal was tapped, to edit it.
   onPressEntry: (entry: MealPlanEntry) => void;
 };
 
+// "1 serving" or "4 servings".
 export function formatServings(servings: number): string {
   return servings === 1 ? "1 serving" : `${servings} servings`;
 }
@@ -26,11 +31,14 @@ export function DaySlots({ slots, recipesById, onAdd, onPressEntry }: DaySlotsPr
         const label = formatOptionLabel(mealType);
         return (
           <View key={mealType} style={styles.slot}>
+            {/* The slot's heading, with a coloured dot for its meal type. */}
             <View style={styles.slotHeader}>
               <View style={[styles.marker, { backgroundColor: MEAL_TYPE_COLORS[mealType] }]} />
               <Text style={styles.slotTitle}>{label}</Text>
             </View>
 
+            {/* One row per planned meal. If its recipe was deleted, the row says
+                "Recipe unavailable" but can still be opened and removed. */}
             {entries.map((entry) => {
               const recipe = recipesById.get(entry.recipeId);
               const title = recipe?.title ?? "Recipe unavailable";
@@ -50,6 +58,7 @@ export function DaySlots({ slots, recipesById, onAdd, onPressEntry }: DaySlotsPr
               );
             })}
 
+            {/* "+ Add" disappears once the slot holds the most meals allowed. */}
             {entries.length < MAX_ENTRIES_PER_SLOT ? (
               <Pressable
                 onPress={() => onAdd(mealType)}

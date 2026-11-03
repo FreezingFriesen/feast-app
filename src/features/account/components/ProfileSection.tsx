@@ -16,9 +16,12 @@ type ProfileSectionProps = {
 // Who is signed in. Shown from the copy on this phone, so it works offline.
 export function ProfileSection({ user, profile }: ProfileSectionProps) {
   const { security } = useAccountFlows();
+  // True while the verification email is being sent.
   const [sending, setSending] = useState(false);
+  // The result of the last "Resend" press, shown under the section.
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
+  // Sends the "verify your email" email again.
   async function resendVerification() {
     setSending(true);
     setMessage(null);
@@ -39,7 +42,8 @@ export function ProfileSection({ user, profile }: ProfileSectionProps) {
       <Text style={styles.username}>{profile.username}</Text>
       <Text style={styles.detail}>{user.email}</Text>
       <Text style={styles.detail}>Member since {formatLongDate(profile.createdAt)}</Text>
-      {/* Decision 3: shown and can be resent, but doesn't block using the app. */}
+      {/* Decision 3: shown and can be resent, but doesn't block using the app.
+          (The decisions are listed in src/services/account/accountDecisions.ts.) */}
       <Text style={styles.detail}>{user.emailVerified ? "Email verified ✓" : "Email not verified yet"}</Text>
       {user.emailVerified ? null : (
         <TextAction

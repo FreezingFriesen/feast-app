@@ -11,6 +11,8 @@ import { dateKeySchema } from "@/validation/mealPlanSchema";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+// The date comes from the link that opened this screen (/meal-planner/day/2026-11-03).
+// If it isn't a real "YYYY-MM-DD" date, show a "not found" message instead.
 export default function DayScreen() {
   // Route params are user-controllable (deep links), so validate before use.
   const { date } = useLocalSearchParams();
@@ -21,20 +23,26 @@ export default function DayScreen() {
   return <DayPlan date={parsed.data} />;
 }
 
+// The day's plan, shown once the date has been checked.
 function DayPlan({ date }: { date: DateKey }) {
   const router = useRouter();
   const navigation = usePlannerNavigation();
   const recipesById = useRecipesById();
+  // Only this one day's meals, split into Breakfast, Lunch and Dinner.
+  // A day with nothing planned gets three empty slots.
   const slots = groupByDay(useMealPlanEntries(date, date)).get(date) ?? emptyDaySlots();
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* This popup has no header bar (see _layout.tsx), so it draws its own title
+          and a Done button that closes it. */}
       <View style={styles.header}>
         <Text style={styles.title}>{formatDay(date)}</Text>
         <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={8}>
           <Text style={styles.done}>Done</Text>
         </Pressable>
       </View>
+      {/* "Add" opens the recipe picker for that slot; tapping a meal opens it for editing. */}
       <DaySlots
         slots={slots}
         recipesById={recipesById}

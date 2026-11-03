@@ -5,6 +5,8 @@ import { storedUsernameSchema, timestampSchema } from "./authSchema";
 import { ALLERGENS, DIET_TAGS, inVocabularyOrder } from "./recipeSchema";
 
 // Limits. Mirror these in the Firestore Security Rules for users/{uid}.
+// A user can pick each allergen and diet at most once, so the lists can't be longer
+// than the full lists.
 export const PROFILE_SCHEMA_VERSION = 1;
 export const MAX_ALLERGENS = ALLERGENS.length;
 export const MAX_DIETS = DIET_TAGS.length;

@@ -12,6 +12,7 @@ export const backendSchema = z.enum(BACKENDS);
 // secrets (the Security Rules control access).
 const firebaseConfigValue = z.string().max(200).regex(FIREBASE_CONFIG_VALUE_PATTERN);
 
+// All six values must be present and match the pattern.
 export const firebaseConfigSchema = z.object({
   apiKey: firebaseConfigValue,
   authDomain: firebaseConfigValue,

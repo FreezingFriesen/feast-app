@@ -16,6 +16,7 @@ export type SignUpResult =
   | { status: "needs_username"; error: SignUpErrorCode }
   | { status: "failed"; error: SignUpErrorCode };
 
+// Saved, or why the username couldn't be saved.
 export type ChooseUsernameResult = { ok: true } | { ok: false; error: SignUpErrorCode };
 
 export type SignUpFlow = {
@@ -32,16 +33,19 @@ type SignUpDependencies = {
   sessionGuard: SessionGuard;
 };
 
+// Shorthand for a failed sign up result.
 const failed = (error: SignUpErrorCode) => ({ status: "failed", error }) as const;
 
 // Cleanup that must not hide the real result.
 const quietly = (promise: Promise<unknown>) => promise.catch(() => {});
 
+// Each method returns a result and never throws, so screens only check the status.
 export function createSignUpFlow({ auth, usernames, profiles, sessionGuard }: SignUpDependencies): SignUpFlow {
   // Claims the name (which creates users/{uid}) and caches the profile on the device,
   // so the Account screen works offline straight away.
   async function claimAndCache(uid: string, username: string): Promise<ChooseUsernameResult> {
     const claim = await usernames.claim(uid, username);
+    // not_owner isn't something the user can fix, so it's shown as a general error.
     if (!claim.ok) {
       const error = claim.reason === "not_owner" ? "unknown" : claim.reason;
       return { ok: false, error };
@@ -63,6 +67,7 @@ export function createSignUpFlow({ auth, usernames, profiles, sessionGuard }: Si
         const availability = await usernames.isAvailable(username);
         if (availability !== "available") return failed(availability);
 
+        // Start the 30-day session, then create the login. If that fails, end the session again.
         await sessionGuard.startSession();
         const created = await auth.signUp({ email, password });
         if (!created.ok) {
@@ -80,12 +85,14 @@ export function createSignUpFlow({ auth, usernames, profiles, sessionGuard }: Si
           await quietly(sessionGuard.endSession());
           return failed(claimed.error);
         }
+        // Couldn't undo it either: the user stays signed in and chooses a username next.
         return { status: "needs_username", error: claimed.error };
       } catch (error) {
         return failed(errorCodeIn(error, SIGN_UP_ERRORS));
       }
     },
 
+    // The user ID comes from the signed-in session, never from the screen.
     async chooseUsername(input) {
       try {
         const user = auth.currentUser();

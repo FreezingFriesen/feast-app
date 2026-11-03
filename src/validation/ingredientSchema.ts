@@ -9,6 +9,7 @@ import { dateKeySchema } from "./mealPlanSchema";
 import { ID_PATTERN, NAME_PATTERN } from "./patterns";
 import { ALLERGENS, DIET_TAGS } from "./recipeSchema";
 
+// Constants for allowed values in the ingredient schema
 export const INGREDIENT_CATEGORIES = [
   "produce",
   "dairy_eggs",
@@ -26,16 +27,20 @@ export const PACKAGE_UNITS = ["g", "kg", "ml", "l", "lb", "each"] as const;
 export const CURRENCIES = ["CAD"] as const;
 export const REGIONS = ["Alberta"] as const;
 
+// The earliest allowed priceCollectedAt date.
 export const MIN_PRICE_DATE = "2020-01-01";
 // Sugar plus fibre may be above carbs by this much before it is reported (rounding).
 export const CARB_SLACK_G = 1.5;
 
+// Helper functions for ingredient schema validation
+// name: short names with the character allowlist. freeText: cleaned, length only.
 const name = (max: number) =>
   z.string().transform(cleanText).pipe(z.string().min(1).max(max).regex(NAME_PATTERN));
 
 const freeText = (max: number) =>
   z.string().transform(cleanText).pipe(z.string().min(1).max(max));
 
+// amount: zero or more (e.g. grams of fat). positive: more than zero (e.g. a price).
 const amount = (max: number) => z.number().min(0).max(max);
 const positive = (max: number) => z.number().positive().max(max);
 
@@ -50,12 +55,12 @@ export const ingredientSchema = z
     aliases: z.array(name(50)).max(10).default([]),
     category: z.enum(INGREDIENT_CATEGORIES),
 
-    // Unit conversion (N-08). Often blank: the app must say "can't convert", never guess.
+    // Unit conversion. Often blank: the app must say "can't convert", never guess.
     gramsPerCup: positive(1000).optional(),
     gramsPerPiece: positive(5000).optional(),
     pieceDescription: freeText(100).optional(),
 
-    // Price (N-06)
+    // Price
     packagePrice: positive(10_000).refine(
       (price) => Math.abs(price * 100 - Math.round(price * 100)) < 1e-9,
       "At most 2 decimal places",
@@ -92,6 +97,7 @@ export const ingredientSchema = z
     lastUpdated: dateKeySchema,
     notes: freeText(500).optional(),
   })
+  // Checks across fields, for numbers that can't all be true at once.
   .refine((i) => i.proteinG + i.carbsG + i.fatG <= 100, {
     path: ["fatG"],
     message: "Protein, carbs and fat add up to more than 100 g",
@@ -113,6 +119,7 @@ export const ingredientSchema = z
     message: "Duplicate diet tag",
   });
 
+// One ingredient after it has been cleaned and checked.
 export type Ingredient = z.output<typeof ingredientSchema>;
 
 // Things that look wrong but are still saved (guide section 9, item 7).

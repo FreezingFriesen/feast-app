@@ -11,6 +11,8 @@ export function useSessionCheck(): SessionCheck | null {
   const uid = useAuthUser()?.uid;
   const [check, setCheck] = useState<SessionCheck | null>(null);
 
+  // Runs again whenever the signed-in user changes (uid). If this is cleaned up before
+  // a check finishes, "active" is false and that result is ignored.
   useEffect(() => {
     let active = true;
     const run = () => {
@@ -23,6 +25,8 @@ export function useSessionCheck(): SessionCheck | null {
       );
     };
     run();
+    // AppState says when the app moves between the foreground and the background.
+    // "active" means the user has just come back to it.
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") run();
     });

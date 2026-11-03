@@ -22,26 +22,40 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 
+// Where the user is: "verify" (enter password), "confirm" (type username) or "done".
 type Step = "verify" | "confirm" | "done";
 
+// Opened from the signed-in Account page. Every deletion step is safe to repeat,
+// so if it stops part way, "Try again" runs it again and finishes the job.
 export default function DeleteAccountScreen() {
   const router = useRouter();
   const { security, deleteAccount } = useAccountFlows();
+  // Clears everything Feast has saved on this phone.
   const localData = useLocalDataWiper();
+  // The signed-in user and their profile (for the username).
   const account = useAccountProfile();
+  // true or false once known, null while the first check is still running.
   const online = useOnline();
   const [step, setStep] = useState<Step>("verify");
   const [password, setPassword] = useState("");
+  // The username as typed by the user to confirm.
   const [confirmation, setConfirmation] = useState("");
+  // An error message under a box, keyed by its name ("password" or "confirmation").
   const [errors, setErrors] = useState<FieldErrors>({});
+  // An error for the whole form, e.g. no connection.
   const [message, setMessage] = useState<string | null>(null);
+  // Why the last deletion attempt failed, and what "Try again" should do.
   const [failure, setFailure] = useState<DeletionFailureView | null>(null);
+  // True while checking the password or deleting, so buttons can't be pressed twice.
   const [busy, setBusy] = useState(false);
   // Kept when step 2 starts: the profile disappears from the phone as the account is deleted.
   const [subject, setSubject] = useState<{ username: string; email: string | null } | null>(null);
 
+  // Only true once we know the phone is offline. While the first check is still
+  // running, the buttons stay enabled.
   const offline = online === false;
 
+  // Finished: the account is gone. "Done" goes back to the Account page.
   if (step === "done") {
     return (
       <AccountFormScreen>
@@ -64,6 +78,8 @@ export default function DeleteAccountScreen() {
         setBusy(false);
       }
     };
+
+    // Explain what went wrong, with a button to try clearing the phone again.
     return (
       <AccountFormScreen>
         <FormMessage tone="error" message={failure.message} />
@@ -73,6 +89,9 @@ export default function DeleteAccountScreen() {
     );
   }
 
+  // Nobody is signed in, or the profile isn't ready, so there's nothing to delete.
+  // Not shown while busy: the profile disappears from the phone during the deletion,
+  // and this message shouldn't replace the screen part way through.
   if (account.status !== "ready" && !busy) {
     return (
       <AccountFormScreen>
@@ -82,6 +101,7 @@ export default function DeleteAccountScreen() {
     );
   }
 
+  // Step 1: "Continue" was pressed. Check the password, then move on to step 2.
   async function handleVerify() {
     if (account.status !== "ready") return;
     setMessage(null);
@@ -95,6 +115,7 @@ export default function DeleteAccountScreen() {
     try {
       const result = await security.verifyPassword(parsed.data);
       if (result.ok) {
+        // Remember the username and email now, for the list shown in step 2.
         setSubject({ username: account.profile.username, email: account.user.email });
         setStep("confirm");
       } else if (result.field === "password") {
@@ -107,6 +128,7 @@ export default function DeleteAccountScreen() {
     }
   }
 
+  // Step 2: "Delete my account" was pressed. Delete everything.
   async function handleDelete() {
     setFailure(null);
     setErrors({});
@@ -120,6 +142,8 @@ export default function DeleteAccountScreen() {
         setStep("done");
         return;
       }
+      // It didn't work. Depending on why: go back to step 1 for a wrong password,
+      // mark the username box if it doesn't match, or show the error with "Try again".
       const view = deletionFailureView(result);
       if (view.field === "password") {
         setPassword("");
@@ -135,6 +159,7 @@ export default function DeleteAccountScreen() {
     }
   }
 
+  // Step 1 on screen: the password box.
   if (step === "verify" || subject === null) {
     return (
       <AccountFormScreen>
@@ -164,6 +189,7 @@ export default function DeleteAccountScreen() {
     );
   }
 
+  // Step 2 on screen: the list of what will be deleted, and the box to type the username.
   return (
     <AccountFormScreen>
       {offline ? <FormMessage tone="info" message={offlineMessage("delete_account")} /> : null}
@@ -176,6 +202,7 @@ export default function DeleteAccountScreen() {
         </Text>
       ))}
       <Text style={styles.warning}>This can&apos;t be undone.</Text>
+      {/* Autocomplete is turned off so the phone can't fill this in for the user. */}
       <FormField
         label={`Type your username (${subject.username}) to confirm`}
         value={confirmation}
@@ -189,6 +216,8 @@ export default function DeleteAccountScreen() {
         textContentType="none"
       />
       {failure ? <FormMessage tone="error" message={failure.message} /> : null}
+      {/* The red delete button only works once the typed username matches. After a
+          failed attempt it says "Try again". */}
       <SubmitButton
         label={failure?.retry === "delete" ? "Try again" : "Delete my account"}
         busyLabel="Deleting…"

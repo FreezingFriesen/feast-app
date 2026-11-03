@@ -5,6 +5,9 @@ import { withDomainErrors } from "@/services/domainErrors";
 import type { SecureSessionStore } from "./SecureSessionStore";
 import type { SessionPolicy } from "./SessionPolicy";
 
+// The session guard enforces the 30-day session on the device. Firebase refresh tokens never expire
+// on their own, so without this a session would last forever. It is used by the account flows
+// and the app-wide session check (useSessionCheck) to sign out the user when the session has expired.
 export type SessionCheck =
   | { state: "signed_out" }
   | { state: "active"; expiresAt: number }
@@ -21,6 +24,10 @@ export type SessionGuard = {
   check(): Promise<SessionCheck>;
 };
 
+// The dependencies for the session guard. The auth service is used to sign out the user
+// when the session has ended. The store holds the login date, and the policy checks whether
+// it is still valid. The wiper removes local data when the session has expired, but only if
+// wipeOnExpiry is on. It's off by default (ACCOUNT_DECISIONS keeps local data on expiry).
 type SessionGuardDependencies = {
   auth: AuthService;
   store: SecureSessionStore;
@@ -51,16 +58,19 @@ export function createSessionGuard({
 
     check: () =>
       withDomainErrors(async (): Promise<SessionCheck> => {
+        // Wait for a saved login to be restored. Nobody signed in: nothing to check.
         await auth.whenReady();
         if (!auth.currentUser()) {
           return { state: "signed_out" };
         }
 
+        // Still inside the 30 days: report when it ends.
         const status = policy.evaluate(await store.getLoginAt());
         if (status.state === "active") {
           return { state: "active", expiresAt: status.expiresAt };
         }
 
+        // Expired, missing or untrustworthy: sign out and clear the stored session.
         await auth.signOut();
         await store.clear();
         if (wipeOnExpiry) {

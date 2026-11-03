@@ -10,6 +10,7 @@ import type {
   UsernameReleaseResult,
 } from "./UsernameRegistry";
 
+// The error codes each method passes on as-is. Anything else becomes "unknown".
 const AVAILABILITY_ERRORS = ["offline"] as const;
 const CLAIM_ERRORS = ["offline", "taken", "not_owner", "invalid_input"] as const;
 const RELEASE_ERRORS = ["offline", "not_owner", "invalid_input"] as const;
@@ -46,6 +47,7 @@ export function createInMemoryUsernameRegistry(server: InMemoryServer): Username
             return { ok: false, reason: "taken" };
           }
 
+          // The new user's profile: the username, and no dietary restrictions set yet.
           const timestamp = server.now();
           const profile: StoredProfile = storedProfileSchema.parse({
             username: name,
@@ -77,6 +79,7 @@ export function createInMemoryUsernameRegistry(server: InMemoryServer): Username
           const owner = server.state.usernames.get(name);
           // Already free: succeeding here makes a half-finished account deletion retryable.
           if (owner === undefined) return { ok: true };
+          // Only the owner, while signed in, can free their own name.
           if (owner !== uid || server.signedInUid !== uid) return { ok: false, reason: "not_owner" };
           server.state.usernames.delete(name);
           return { ok: true };

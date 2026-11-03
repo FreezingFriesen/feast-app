@@ -14,6 +14,8 @@ import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 
+// The date and meal type come from the link that opened this screen. If either one
+// isn't valid, show a "not found" message instead of the picker.
 export default function PickRecipeScreen() {
   // Route params are user-controllable (deep links), so validate before use.
   const params = useLocalSearchParams();
@@ -29,9 +31,13 @@ function RecipePicker({ date, mealType }: { date: DateKey; mealType: PlannerMeal
   const mealPlans = useMealPlanRepository();
   const recipes = useRecipes();
   const [error, setError] = useState<string | null>(null);
+  // True while the meal is being added, so a second recipe can't be tapped meanwhile.
   const [saving, setSaving] = useState(false);
+  // "breakfast" -> "Breakfast", for the title and section headings.
   const label = formatOptionLabel(mealType);
 
+  // Split the recipes into two groups: those tagged with this slot's meal type, and the
+  // rest. A group with no recipes in it is left out, so no empty heading is shown.
   const tagged = recipes.filter((recipe) => recipe.mealTypes.includes(mealType));
   const others = recipes.filter((recipe) => !recipe.mealTypes.includes(mealType));
   const sections = [
@@ -40,6 +46,8 @@ function RecipePicker({ date, mealType }: { date: DateKey; mealType: PlannerMeal
   ].filter((section) => section.data.length > 0);
 
   // Adds the recipe at its own serving size; the user can change it afterwards.
+  // The plan stores only the recipe's ID, not a copy of the recipe. On success, close
+  // the picker and go back to the planner.
   async function handlePick(recipe: Recipe) {
     setSaving(true);
     setError(null);
@@ -62,13 +70,18 @@ function RecipePicker({ date, mealType }: { date: DateKey; mealType: PlannerMeal
 
   return (
     <>
+      {/* The header title names the slot, e.g. "Dinner · Tue, Nov 3". */}
       <Stack.Screen options={{ title: `${label} · ${formatDay(date)}` }} />
+      {/* SectionList is a list with headings, which scroll away with the list (not
+          sticky). Each recipe is a button that adds it to the slot. */}
       <SectionList
         sections={sections}
         keyExtractor={(recipe) => recipe.id}
         contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.list}
         stickySectionHeadersEnabled={false}
+        // An error (e.g. the slot is full) is shown at the top of the list.
         ListHeaderComponent={error ? <FieldError message={error} /> : null}
+        // Shown when the user has no recipes at all.
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No recipes yet</Text>

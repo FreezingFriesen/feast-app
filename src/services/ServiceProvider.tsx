@@ -25,6 +25,7 @@ export type Services = {
   localData: LocalDataWiper;
 };
 
+// Shares the services with every screen inside ServiceProvider.
 const ServiceContext = createContext<Services | null>(null);
 
 type ServiceProviderProps = {
@@ -33,11 +34,14 @@ type ServiceProviderProps = {
   services: Services;
 };
 
+// Makes the services available to every screen inside it. useState keeps the first
+// set it was given, so the services never change while the app is running.
 export function ServiceProvider({ children, services }: ServiceProviderProps) {
   const [value] = useState<Services>(() => services);
   return <ServiceContext.Provider value={value}>{children}</ServiceContext.Provider>;
 }
 
+// Fails loudly if a screen is used outside the provider (a setup mistake).
 function useServices(): Services {
   const services = useContext(ServiceContext);
   if (!services) {
@@ -46,6 +50,7 @@ function useServices(): Services {
   return services;
 }
 
+// One hook per service, so a screen asks only for what it uses.
 export function useAuthService(): AuthService {
   return useServices().auth;
 }

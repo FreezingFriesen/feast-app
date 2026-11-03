@@ -20,6 +20,7 @@ export type AccountAction =
   | "verify_email"
   | "delete_account";
 
+// How each action reads at the end of a sentence.
 const ACTION_TEXT: Record<AccountAction, string> = {
   log_in: "log in",
   sign_up: "create an account",
@@ -30,17 +31,21 @@ const ACTION_TEXT: Record<AccountAction, string> = {
   delete_account: "delete your account",
 };
 
+// The username rules in words, built from the same limits the schema uses.
 export const USERNAME_HINT = `${MIN_USERNAME_LENGTH}–${MAX_USERNAME_LENGTH} characters: letters, numbers and underscores.`;
 
 // N-16: shown whether or not an account exists for the email.
 export const PASSWORD_RESET_SENT =
   "If an account exists for that email, we've sent it a link to reset your password. Check your inbox.";
 
+// e.g. "You're offline. Connect to the internet to log in."
 export function offlineMessage(action: AccountAction): string {
   return `You're offline. Connect to the internet to ${ACTION_TEXT[action]}.`;
 }
 
 // Messages never repeat what the user typed and never say whether an account exists.
+// Turns an error code from the account services into a sentence for the screen.
+// Any code not listed gets a general "Something went wrong".
 export function accountErrorMessage(code: DomainErrorCode, action: AccountAction): string {
   switch (code) {
     case "invalid_credentials":
@@ -68,6 +73,7 @@ export function accountErrorMessage(code: DomainErrorCode, action: AccountAction
 
 // Field wording for the account forms. Falls back to the shared wording.
 export function accountFieldMessage(issue: z.core.$ZodIssue): string {
+  // Which box the problem is in, e.g. "email".
   const field = String(issue.path[0] ?? "");
   switch (field) {
     case "email":
@@ -91,6 +97,7 @@ export function accountFieldMessage(issue: z.core.$ZodIssue): string {
   }
 }
 
+// The colour of the hint: grey, green or red.
 export type UsernameCheckTone = "muted" | "success" | "error";
 
 // The line under the username field while typing. Rule hints aren't shown as errors.

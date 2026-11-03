@@ -12,6 +12,7 @@ export type StoredProfile = z.output<typeof storedProfileSchema>;
 // The uid always comes from the auth session, never from route params.
 export type Profile = StoredProfile & { uid: string };
 
+// What setDietaryRestrictions() returns: the saved profile, or why it wasn't saved.
 export type ProfileWriteResult =
   | { ok: true; profile: Profile }
   | { ok: false; reason: "invalid"; error: z.ZodError }
@@ -25,6 +26,7 @@ export type ProfileMergeResult = "applied" | "kept_local" | "invalid";
 // Screens depend on this interface only. Implementations (in-memory now,
 // SQLite + Firestore sync later) are swapped in through RepositoryProvider.
 export type ProfileRepository = {
+  // The profile on this device, or undefined if there isn't one.
   get(uid: string): Promise<Profile | undefined>;
   // Validates the input with dietaryRestrictionsSchema, writes locally first and
   // bumps updatedAt so sync uploads it later.

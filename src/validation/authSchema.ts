@@ -60,6 +60,8 @@ export const storedUsernameSchema = z.string().max(MAX_USERNAME_LENGTH).regex(US
 
 // Forms
 
+// Sign up: email, username, password, confirmPassword. The confirmPassword field is
+// only used for validation, and is stripped out of the final object.
 export const signUpFormSchema = z
   .object({
     email: emailSchema,
@@ -73,6 +75,8 @@ export const signUpFormSchema = z
   })
   .transform(({ email, username, password }) => ({ email, username, password }));
 
+// Change password: currentPassword, newPassword, confirmPassword. The confirmPassword field is
+// only used for validation, and is stripped out of the final object.
 export const changePasswordFormSchema = z
   .object({
     currentPassword: currentPasswordSchema,
@@ -98,6 +102,7 @@ export const deleteAccountSchema = z.object({ password: currentPasswordSchema, c
 // Choosing a username for an account whose sign up stopped before the username was saved.
 export const chooseUsernameSchema = z.object({ username: usernameSchema });
 
+// A new account needs a password that meets the rules; logging in only needs one typed.
 export const newAccountSchema = z.object({ email: emailSchema, password: passwordSchema });
 export const signInSchema = z.object({ email: emailSchema, password: currentPasswordSchema });
 export const passwordResetSchema = z.object({ email: emailSchema });
@@ -106,6 +111,8 @@ export const newPasswordSchema = z.object({ newPassword: passwordSchema });
 
 // Session data read back from secure storage (untrusted like any other stored data)
 
+// Limits for chunkedSecureStorage: the size of each piece, how many pieces one item
+// can use, how many items there can be, and how long an item's name can be.
 export const SESSION_CHUNK_LENGTH = 600; // UTF-16 code units: at most 1800 UTF-8 bytes
 export const MAX_SESSION_CHUNKS = 16;
 export const MAX_SESSION_ITEMS = 8;

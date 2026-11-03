@@ -42,6 +42,8 @@ export function resolveBackend(raw: string | undefined, isDev: boolean): Backend
   return parsed.data;
 }
 
+// What the app (or a test) hands in: which backend, the opened database, secure
+// storage, the network checker, a clock, and a fake network delay.
 type AppServicesOptions = {
   backend: Backend;
   database: SqlDatabase;
@@ -51,6 +53,7 @@ type AppServicesOptions = {
   latencyMs?: number;
 };
 
+// Everything the app runs on, built once at startup.
 export type AppServices = {
   services: Services;
   repositories: Repositories;
@@ -58,6 +61,8 @@ export type AppServices = {
   devControls: InMemoryServerControls | null;
 };
 
+// The services that talk to the server. These are the only ones that change between
+// the in-memory backend and Firebase.
 type Remote = {
   auth: AuthService;
   usernames: UsernameRegistry;
@@ -66,6 +71,8 @@ type Remote = {
   devControls: InMemoryServerControls | null;
 };
 
+// Builds the server-side services for the chosen backend. "firebase" gives the stubs
+// (they fail until Phase 6); "memory" gives fakes that share one pretend server.
 function createRemote(backend: Backend, connectivity: ConnectivityService, now: () => number, latencyMs: number): Remote {
   if (backend === "firebase") {
     return {
@@ -86,6 +93,8 @@ function createRemote(backend: Backend, connectivity: ConnectivityService, now: 
   };
 }
 
+// Builds every repository and service and connects them together. Each piece gets the
+// pieces it needs passed in (dependency injection), so nothing reaches out for its own.
 export function createAppServices({
   backend,
   database,
@@ -108,8 +117,10 @@ export function createAppServices({
     now,
     latencyMs,
   );
+  // The 30-day session: where the login date is kept, and the rule that checks it.
   const sessionStore = createSecureSessionStore(secure);
   const sessionPolicy = createSessionPolicy(now);
+  // Clears every repository on this phone (log out, account deletion).
   const localData = createLocalDataWiper([repositories.profiles, repositories.recipes, repositories.mealPlans]);
 
   return {

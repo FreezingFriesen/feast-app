@@ -20,10 +20,15 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+// Shown when the meal doesn't exist, e.g. it was removed or the link was wrong.
 const NOT_FOUND = (
   <PlaceholderScreen title="Meal not found" description="This meal is no longer in your plan." />
 );
 
+// This screen is split into three parts:
+// 1. EntryScreen checks the meal's ID from the link that opened the screen.
+// 2. EntryLoader looks the meal up.
+// 3. EntryEditor shows the controls for changing it.
 export default function EntryScreen() {
   // Route params are user-controllable (deep links), so validate before use.
   const { id } = useLocalSearchParams();
@@ -37,6 +42,8 @@ function EntryLoader({ id }: { id: string }) {
   // undefined = still loading, null = not found
   const [entry, setEntry] = useState<MealPlanEntry | null | undefined>(undefined);
 
+  // Look the meal up when the screen opens. If the screen closes before the answer
+  // comes back, "active" is false and the answer is ignored.
   useEffect(() => {
     let active = true;
     mealPlans.getById(id).then((found) => {
@@ -47,6 +54,7 @@ function EntryLoader({ id }: { id: string }) {
     };
   }, [mealPlans, id]);
 
+  // Show nothing while loading, so the "not found" message doesn't flash up first.
   if (entry === undefined) return null;
   if (entry === null) return NOT_FOUND;
   return <EntryEditor entry={entry} />;
@@ -55,17 +63,23 @@ function EntryLoader({ id }: { id: string }) {
 function EntryEditor({ entry }: { entry: MealPlanEntry }) {
   const router = useRouter();
   const mealPlans = useMealPlanRepository();
+  // The recipe this meal uses. It can be missing if the recipe was deleted.
   const recipe = useRecipesById().get(entry.recipeId);
+  // The user's changes. Nothing is saved until they press "Save changes".
   const [servings, setServings] = useState(entry.servings);
   const [date, setDate] = useState(entry.date);
   const [mealType, setMealType] = useState(entry.mealType);
   const [error, setError] = useState<string | null>(null);
+  // True while saving or removing, so the buttons can't be pressed twice.
   const [saving, setSaving] = useState(false);
 
+  // Has anything changed? If not, the save button stays disabled.
   const changed =
     servings !== entry.servings || date !== entry.date || mealType !== entry.mealType;
 
   // The repository validates the update again before writing.
+  // It can refuse it, e.g. if the new slot already has the most meals allowed.
+  // On success, close this screen and go back to the planner.
   async function handleSave() {
     setSaving(true);
     setError(null);
@@ -81,6 +95,8 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
     }
   }
 
+  // Takes the meal out of the plan. It is marked as deleted rather than erased, so a
+  // later sync can't bring it back. The recipe itself is not touched.
   async function handleRemove() {
     setSaving(true);
     setError(null);
@@ -98,10 +114,13 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* The recipe's name, or a greyed-out "Recipe unavailable" if it was deleted. */}
       <Text style={[styles.recipeTitle, !recipe && styles.unavailable]}>
         {recipe?.title ?? "Recipe unavailable"}
       </Text>
 
+      {/* Servings: − and + buttons around the number. Each button is disabled at
+          the lowest or highest number allowed. */}
       <Text style={styles.sectionTitle}>Servings</Text>
       <View style={styles.stepper}>
         <Pressable
@@ -127,9 +146,12 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
         </Pressable>
       </View>
 
+      {/* Move to: pick a day from the week strip, then Breakfast, Lunch or Dinner.
+          The line underneath shows where the meal will end up. */}
       <Text style={styles.sectionTitle}>Move to</Text>
       <WeekStrip selectedKey={date} onSelect={setDate} todayKey={todayKey()} />
       <View style={styles.spacer} />
+      {/* Exactly one meal type is always selected; tapping another one switches to it. */}
       <ChipSelect
         options={PLANNER_MEAL_TYPES}
         selected={[mealType]}
@@ -139,6 +161,7 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
         {formatDay(date)} · {formatOptionLabel(mealType)}
       </Text>
 
+      {/* The error from the last save or remove, if it didn't work. */}
       {error ? <FieldError message={error} /> : null}
       <Pressable
         onPress={handleSave}

@@ -1,6 +1,7 @@
 import { domainError } from "@/services/domainErrors";
 import type { RemoteProfileStore } from "./RemoteProfileStore";
 
+// Both methods below use this, which always fails.
 const notConfigured = async (): Promise<never> => {
   throw domainError("backend_not_configured");
 };

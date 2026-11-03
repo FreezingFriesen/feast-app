@@ -26,6 +26,7 @@ export function useAccountFlows() {
   const profiles = useProfileRepository();
   const sync = useSyncService();
 
+  // The flows are memoized so that they don't change on every render. They only change if the services they depend on change.
   return useMemo(
     () => ({
       signUp: createSignUpFlow({ auth, usernames, profiles, sessionGuard }),

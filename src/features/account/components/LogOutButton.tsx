@@ -12,11 +12,15 @@ import { useSyncStatus } from "../useSyncStatus";
 // Logging out itself works offline.
 export function LogOutButton() {
   const { logOut } = useAccountFlows();
+  // How many changes are waiting to sync, and whether sync is working at all.
   const status = useSyncStatus();
   const online = useOnline();
+  // True while logging out, so the button can't be pressed twice.
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Logs out, after syncing first if the user chose "Sync, then log out".
+  // If sync fails, the user stays logged in so nothing is lost.
   async function run(choice: LogOutChoice) {
     setBusy(true);
     setError(null);
@@ -34,6 +38,8 @@ export function LogOutButton() {
     }
   }
 
+  // Shows the phone's own pop-up asking "Log out?". The wording and buttons come from
+  // logOutPrompt, which depends on whether there are unsynced changes. Cancel does nothing.
   function confirmLogOut() {
     const prompt = logOutPrompt({
       pendingChanges: status.pendingChanges,

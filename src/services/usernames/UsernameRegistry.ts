@@ -1,6 +1,7 @@
 import type { StoredProfile } from "@/repositories/ProfileRepository";
 import type { DomainErrorCode } from "@/services/domainErrors";
 
+// The answer to "is this name free?", or why it couldn't be checked.
 export type UsernameAvailability =
   | "available"
   | Extract<DomainErrorCode, "taken" | "invalid_input" | "offline" | "unknown">;
@@ -12,6 +13,7 @@ export type UsernameClaimResult =
   // not_owner: uid is not the signed-in user.
   | { ok: false; reason: Extract<DomainErrorCode, "taken" | "not_owner" | "invalid_input" | "offline" | "unknown"> };
 
+// Freed (or already free), or why it couldn't be freed.
 export type UsernameReleaseResult =
   | { ok: true }
   | { ok: false; reason: Extract<DomainErrorCode, "not_owner" | "invalid_input" | "offline" | "unknown"> };

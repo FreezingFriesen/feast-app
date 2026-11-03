@@ -1,6 +1,9 @@
 import { Stack } from "expo-router";
 
 // This layout is shared across all the routes defined in the /account directory.
+// The screens stack on top of each other as the user moves between them, and the back
+// button returns to the one underneath. Each line sets the header title for one screen;
+// "name" is the screen's file name (log-in.tsx -> "log-in").
 export default function AccountLayout() {
   return (
     <Stack>

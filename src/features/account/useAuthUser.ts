@@ -3,6 +3,7 @@ import { useAuthService } from "@/services/ServiceProvider";
 import { useSyncExternalStore } from "react";
 
 // The signed-in user, or null. Updates when the user signs in or out.
+// useSyncExternalStore listens to the auth service and re-draws the screen on each change.
 export function useAuthUser(): AuthUser | null {
   const auth = useAuthService();
   return useSyncExternalStore(auth.subscribe, auth.currentUser);

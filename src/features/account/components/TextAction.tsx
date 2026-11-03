@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text } from "react-native";
 
+// The text, what happens when it's tapped, and whether it can be tapped right now.
 type TextActionProps = {
   label: string;
   onPress: () => void;
@@ -10,6 +11,7 @@ type TextActionProps = {
 
 // A secondary action shown as text, like "Forgot password?" (same style as "+ Add step").
 export function TextAction({ label, onPress, disabled = false, tone = "default" }: TextActionProps) {
+  // hitSlop makes the tappable area 8 points bigger on every side than the text.
   return (
     <Pressable
       onPress={onPress}

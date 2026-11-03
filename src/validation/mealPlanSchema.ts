@@ -15,6 +15,8 @@ export const MIN_SERVINGS = 1;
 export const MAX_SERVINGS = 100;
 
 // "2026-02-30" matches the pattern but is not a real day.
+// JavaScript quietly rolls Feb 30 over to Mar 2, so if the parts read back differently,
+// the date didn't exist.
 function isRealDate(key: string): boolean {
   const [year, month, day] = key.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -33,6 +35,7 @@ export const dateKeySchema = z
   .refine(isRealDate, "Not a real date")
   .refine((key) => key >= MIN_DATE_KEY && key <= MAX_DATE_KEY, "Date is out of range");
 
+// A meal plan entry's ID, e.g. from the link that opens the edit screen.
 export const mealPlanEntryIdSchema = z.string().max(100).regex(ID_PATTERN);
 
 // One recipe in one slot. Stores the recipe ID and servings, never a copy of the recipe.

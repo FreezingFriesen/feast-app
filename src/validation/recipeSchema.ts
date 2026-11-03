@@ -1,8 +1,15 @@
 // src/validation/recipeSchema.ts
+// This file contains the schema for validating recipe data. 
+// It uses the Zod library to define the structure and constraints of a recipe object, 
+// including its title, description, servings, preparation and cooking times, 
+// meal types, ingredients, steps, diet tags, and notes. 
+// The schema ensures that the data adheres to specific rules, 
+// such as length limits and allowed values.
 import { z } from "zod";
 import { cleanText } from "./clean";
 import { NAME_PATTERN } from "./patterns";
 
+// Constants for allowed values in the recipe schema
 export const UNITS = ["g","kg","ml","l","tsp","tbsp","cup","oz","lb","piece","pinch"] as const;
 export const DIET_TAGS = ["vegan","vegetarian","pescatarian","keto_friendly","gluten_free","dairy_free"] as const;
 export const MEAL_TYPES = ["breakfast","lunch","dinner","snack"] as const;
@@ -26,6 +33,7 @@ export function inVocabularyOrder<T extends string>(vocabulary: readonly T[]) {
   return (values: T[]): T[] => vocabulary.filter((value) => values.includes(value));
 }
 
+// Schema for a single ingredient row in a recipe
 export const ingredientRowSchema = z.object({
   ingredientId: z.string().max(100).optional(),   // empty = unmatched
   name: safeName(100),
@@ -34,6 +42,7 @@ export const ingredientRowSchema = z.object({
   note: safeText(0, 100).optional(),
 });
 
+// Main schema for validating a recipe object
 export const recipeSchema = z.object({
   title: safeName(100),
   description: safeText(0, 500).optional(),
@@ -46,16 +55,3 @@ export const recipeSchema = z.object({
   dietTags: z.array(z.enum(DIET_TAGS)).max(6).transform(inVocabularyOrder(DIET_TAGS)).default([]),
   notes: safeText(0, 1000).optional(),
 });
-
-
-
-//***How to use:***
-
-//import { recipeSchema } from "@/src/validation/recipeSchema";
-
-// const result = recipeSchema.safeParse(formValues);
-// if (!result.success) {
-//   // result.error.issues has the field and message for each problem
-// } else {
-//   // result.data is the cleaned, validated recipe; save this one, not formValues
-// }

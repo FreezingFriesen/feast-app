@@ -15,10 +15,15 @@ import { MEAL_TYPE_COLORS } from "../mealTypeColors";
 type MonthGridProps = {
   // Any day in the month to show.
   monthKey: DateKey;
+  // Today gets a filled circle.
   todayKey: DateKey;
+  // The highlighted day, if any.
   selectedKey?: DateKey;
+  // The month's planned meals, by day.
   days: ReadonlyMap<DateKey, DaySlotEntries>;
+  // A day was tapped.
   onPressDay: (key: DateKey) => void;
+  // An arrow was tapped: -1 for the previous month, 1 for the next.
   onChangeMonth: (months: number) => void;
 };
 
@@ -33,6 +38,7 @@ export function MonthGrid({
 }: MonthGridProps) {
   return (
     <View style={styles.container}>
+      {/* The top line: previous-month arrow, "November 2026", next-month arrow. */}
       <View style={styles.header}>
         <Pressable
           onPress={() => onChangeMonth(-1)}
@@ -53,6 +59,7 @@ export function MonthGrid({
         </Pressable>
       </View>
 
+      {/* Column headings, Mon to Sun. */}
       <View style={styles.row}>
         {WEEKDAY_LABELS.map((label) => (
           <Text key={label} style={styles.weekday}>
@@ -61,6 +68,7 @@ export function MonthGrid({
         ))}
       </View>
 
+      {/* One row per week. Cells before the 1st and after the last day are blank. */}
       {monthGrid(monthKey).map((week, rowIndex) => (
         <View key={rowIndex} style={styles.row}>
           {week.map((key, cellIndex) => {
@@ -68,10 +76,12 @@ export function MonthGrid({
               return <View key={`blank-${cellIndex}`} style={styles.cell} />;
             }
             const slots = days.get(key);
+            // The meal types with at least one meal planned this day, e.g. ["lunch", "dinner"].
             const planned = PLANNER_MEAL_TYPES.filter((mealType) => (slots?.[mealType].length ?? 0) > 0);
             const isToday = key === todayKey;
             const isSelected = key === selectedKey;
             return (
+              // Screen readers hear the date and what's planned, since they can't see the dots.
               <Pressable
                 key={key}
                 onPress={() => onPressDay(key)}
@@ -86,6 +96,7 @@ export function MonthGrid({
                 <View style={[styles.dayCircle, isToday && styles.todayCircle]}>
                   <Text style={[styles.dayNumber, isToday && styles.todayText]}>{dayOfMonth(key)}</Text>
                 </View>
+                {/* One coloured dot per meal type planned. */}
                 <View style={styles.dots}>
                   {planned.map((mealType) => (
                     <View
@@ -100,6 +111,7 @@ export function MonthGrid({
         </View>
       ))}
 
+      {/* The key under the calendar: which colour is which meal. */}
       <View style={styles.legend}>
         {PLANNER_MEAL_TYPES.map((mealType) => (
           <View key={mealType} style={styles.legendItem}>

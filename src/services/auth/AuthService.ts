@@ -23,7 +23,9 @@ export const AUTH_ERROR_CODES = [
 ] as const satisfies readonly DomainErrorCode[];
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
+// What most auth calls return: it worked, or why it didn't.
 export type AuthResult = { ok: true } | { ok: false; error: AuthErrorCode };
+// The same, plus the user, for sign up and log in.
 export type AuthUserResult = { ok: true; user: AuthUser } | { ok: false; error: AuthErrorCode };
 
 // Screens depend on this interface only. Implementations (in-memory now, Firebase later)
@@ -46,6 +48,8 @@ export type AuthService = {
   // Needed before changePassword, changing email and deleteAuthUser.
   reauthenticate(input: unknown): Promise<AuthResult>; // reauthSchema
   changePassword(input: unknown): Promise<AuthResult>; // newPasswordSchema
+  // Deletes only the login (and signs out). AccountDeleter removes everything else.
   deleteAuthUser(): Promise<AuthResult>;
+  // Sends the "verify your email" email to the signed-in user.
   sendVerificationEmail(): Promise<AuthResult>;
 };

@@ -7,11 +7,14 @@ import type { Profile, ProfileRepository } from "./ProfileRepository";
 export function createInMemoryProfileRepository(
   now: () => number = Date.now,
 ): ProfileRepository {
+  // Every profile on this "device", by user ID.
   const profiles = new Map<string, Profile>();
+  // The screens to tell when something changes (see subscribe below).
   const listeners = new Set<() => void>();
 
   const notify = () => listeners.forEach((listener) => listener());
 
+  // The profile for this user ID, or undefined if the ID isn't valid or there's none.
   const find = (uid: string) => (UID_PATTERN.test(uid) ? profiles.get(uid) : undefined);
 
   return {
@@ -69,6 +72,7 @@ export function createInMemoryProfileRepository(
       notify();
     },
 
+    // Screens call this to hear about changes. The function it returns stops listening.
     subscribe(listener) {
       listeners.add(listener);
       return () => {

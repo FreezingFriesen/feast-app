@@ -2,6 +2,7 @@ import * as SQLite from "expo-sqlite";
 import { runMigrations } from "./migrations";
 import type { SqlDatabase } from "./SqlDatabase";
 
+// The database file on the phone.
 const DATABASE_NAME = "feast.db";
 
 // The device's local database (offline-first source of truth). expo-sqlite is

@@ -5,6 +5,7 @@ export type LocalDataWiper = {
   wipe(): Promise<void>;
 };
 
+// Anything with a clear() method, e.g. a repository.
 type Clearable = { clear(): Promise<void> };
 
 // Built from each local repository's clear(). One failing store doesn't stop the
@@ -13,6 +14,7 @@ type Clearable = { clear(): Promise<void> };
 export function createLocalDataWiper(stores: readonly Clearable[]): LocalDataWiper {
   return {
     async wipe() {
+      // allSettled waits for every clear() to finish, even if some of them fail.
       const results = await Promise.allSettled(stores.map((store) => store.clear()));
       if (results.some((result) => result.status === "rejected")) {
         throw domainError("storage_failed");

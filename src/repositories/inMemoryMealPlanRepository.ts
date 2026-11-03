@@ -9,18 +9,23 @@ import { ID_PATTERN } from "@/validation/patterns";
 import type { MealPlanEntry, MealPlanRepository } from "./MealPlanRepository";
 import { newId } from "./newId";
 
+// The version of the entry format. Raise it if the fields change.
 const SCHEMA_VERSION = 1;
 
 // Temporary store for Sprint 1: the plan lives only while the app is open.
 // Replace with a SQLite implementation of MealPlanRepository for #1.
+// "now" is the clock, so tests can control the timestamps.
 export function createInMemoryMealPlanRepository(
   now: () => number = Date.now,
 ): MealPlanRepository {
+  // Every entry by ID, including removed ones (they keep their deletedAt).
   const entries = new Map<string, MealPlanEntry>();
+  // The screens to tell when something changes (see subscribe below).
   const listeners = new Set<() => void>();
 
   const notify = () => listeners.forEach((listener) => listener());
 
+  // The entry with this ID, unless it's missing, removed, or the ID isn't a valid one.
   const findLive = (id: string) => {
     if (!ID_PATTERN.test(id)) return undefined;
     const entry = entries.get(id);
@@ -54,11 +59,13 @@ export function createInMemoryMealPlanRepository(
         return { ok: false, reason: "slot_full" };
       }
 
+      // A safety check: IDs end up in database paths, so never store one that breaks the ID rule.
       const id = newId();
       if (!ID_PATTERN.test(id)) {
         throw new Error("Generated meal plan entry ID is invalid");
       }
 
+      // Save the cleaned data (result.data), plus the fields the repository sets.
       const timestamp = now();
       const entry: MealPlanEntry = {
         ...result.data,
@@ -72,6 +79,7 @@ export function createInMemoryMealPlanRepository(
       return { ok: true, entry };
     },
 
+    // The patch holds only what changed (date, meal type and/or servings).
     async update(id, patch) {
       const existing = findLive(id);
       if (!existing) {
@@ -96,6 +104,7 @@ export function createInMemoryMealPlanRepository(
         return { ok: false, reason: "slot_full" };
       }
 
+      // A new updatedAt, so this edit wins over older copies when syncing.
       const entry: MealPlanEntry = { ...existing, ...merged.data, updatedAt: now() };
       entries.set(id, entry);
       notify();
@@ -114,6 +123,7 @@ export function createInMemoryMealPlanRepository(
     },
 
     async listBetween(startDate, endDate) {
+      // Invalid dates return nothing rather than an error.
       if (!dateKeySchema.safeParse(startDate).success || !dateKeySchema.safeParse(endDate).success) {
         return [];
       }
@@ -135,6 +145,7 @@ export function createInMemoryMealPlanRepository(
       notify();
     },
 
+    // Screens call this to hear about changes. The function it returns stops listening.
     subscribe(listener) {
       listeners.add(listener);
       return () => {

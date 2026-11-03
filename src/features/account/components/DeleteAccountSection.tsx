@@ -4,6 +4,7 @@ import { AccountSection } from "./AccountSection";
 import { TextAction } from "./TextAction";
 
 // The way into deleting the account (N-17). The steps are on their own screen.
+// A short warning, and a red link that opens the delete-account screen.
 export function DeleteAccountSection() {
   const router = useRouter();
   return (

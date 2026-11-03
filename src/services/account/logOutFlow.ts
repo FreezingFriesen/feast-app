@@ -15,6 +15,7 @@ export type LogOutFlow = {
   logOut(options?: { syncFirst?: boolean }): Promise<LogOutResult>;
 };
 
+// wipeOnLogout defaults to the team decision; tests can pass either value.
 type LogOutDependencies = {
   auth: AuthService;
   sessionGuard: SessionGuard;
@@ -23,8 +24,11 @@ type LogOutDependencies = {
   wipeOnLogout?: boolean;
 };
 
+// The only error code passed on as-is. Anything else becomes "unknown".
 const LOG_OUT_ERRORS = ["storage_failed"] as const;
 
+// Logs out: optionally syncs first, then signs out, ends the 30-day session and
+// (by default) clears this phone's data.
 export function createLogOutFlow({
   auth,
   sessionGuard,

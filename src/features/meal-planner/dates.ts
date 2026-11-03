@@ -3,8 +3,10 @@
 // millisecond arithmetic, so daylight-saving changes cannot shift a day.
 // Functions here expect valid keys; check route params and stored data with dateKeySchema first.
 
+// The date key is a string in the format "YYYY-MM-DD", representing a local date.
 export type DateKey = string;
 
+// Short day names and full month names, for labels like "Tue, Nov 3" and "November 2026".
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -14,31 +16,37 @@ const MONTH_NAMES = [
 // Column headings for a Monday-first week.
 export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
+// Adds a leading zero: 3 -> "03".
 const pad = (value: number) => String(value).padStart(2, "0");
 
 // Noon, so the date is never near a midnight DST jump.
 const localDate = (year: number, monthIndex: number, day: number) =>
   new Date(year, monthIndex, day, 12);
 
+// Turns a Date into its "YYYY-MM-DD" key, using the phone's own time zone.
 export function toDateKey(date: Date): DateKey {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+// Turns a "YYYY-MM-DD" key back into a Date (at noon, local time).
 export function fromDateKey(key: DateKey): Date {
   const [year, month, day] = key.split("-").map(Number);
   return localDate(year, month - 1, day);
 }
 
+// Today's key. Tests can pass in their own clock instead of Date.now.
 export function todayKey(now: () => number = Date.now): DateKey {
   return toDateKey(new Date(now()));
 }
 
+// The key a number of days later (or earlier, if negative). Handles month and year ends.
 export function addDays(key: DateKey, days: number): DateKey {
   const date = fromDateKey(key);
   date.setDate(date.getDate() + days);
   return toDateKey(date);
 }
 
+// Day 0 of the next month is the last day of this one, so its date is the month's length.
 function daysInMonth(year: number, monthIndex: number): number {
   return localDate(year, monthIndex + 1, 0).getDate();
 }
@@ -52,21 +60,25 @@ export function addMonths(key: DateKey, months: number): DateKey {
 }
 
 // Weeks start on Monday.
+// getDay() counts Sunday as 0, so (getDay() + 6) % 7 is how many days ago Monday was.
 export function startOfWeek(key: DateKey): DateKey {
   const mondayOffset = (fromDateKey(key).getDay() + 6) % 7;
   return addDays(key, -mondayOffset);
 }
 
+// The seven days, Monday to Sunday, of the week containing `key`.
 export function weekDays(key: DateKey): DateKey[] {
   const start = startOfWeek(key);
   return Array.from({ length: 7 }, (_, index) => addDays(start, index));
 }
 
+// The Monday and Sunday of the week containing `key`.
 export function weekBounds(key: DateKey): { start: DateKey; end: DateKey } {
   const start = startOfWeek(key);
   return { start, end: addDays(start, 6) };
 }
 
+// Month bounds: the first and last day of the month containing `key`.
 export function monthBounds(key: DateKey): { start: DateKey; end: DateKey } {
   const date = fromDateKey(key);
   const year = date.getFullYear();
@@ -102,6 +114,7 @@ export function monthGrid(key: DateKey): (DateKey | null)[][] {
 
 // Labels use fixed English names so output is the same on every device.
 
+// The day number, e.g. 3 for "2026-11-03".
 export function dayOfMonth(key: DateKey): number {
   return fromDateKey(key).getDate();
 }

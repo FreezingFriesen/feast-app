@@ -3,7 +3,9 @@ export type SyncState = "idle" | "syncing" | "offline" | "error" | "unavailable"
 
 export type SyncStatus = {
   state: SyncState;
+  // When the last sync finished, or null if it never has.
   lastSyncedAt: number | null;
+  // How many changes on this phone haven't been uploaded yet.
   pendingChanges: number;
   // Set while restoring data after logging in on a new device (#19).
   restore: { completed: number; total: number } | null;

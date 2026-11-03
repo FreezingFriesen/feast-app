@@ -15,6 +15,7 @@ export const DOMAIN_ERROR_CODES = [
   "backend_not_configured",
   "unknown",
 ] as const;
+// Any one of the codes above.
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];
 
 // Expected failures (wrong password, offline, name taken) are returned as results
@@ -27,6 +28,7 @@ export function domainError(code: DomainErrorCode): DomainError {
   return Object.assign(new Error(code), { name: "DomainError" as const, code });
 }
 
+// True if this is one of our errors with a known code (used in catch blocks).
 export function isDomainError(value: unknown): value is DomainError {
   return (
     value instanceof Error &&

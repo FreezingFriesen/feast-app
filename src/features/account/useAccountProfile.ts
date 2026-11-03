@@ -6,6 +6,8 @@ import { useRemoteProfileStore } from "@/services/ServiceProvider";
 import { useEffect, useState } from "react";
 import { useAuthUser } from "./useAuthUser";
 
+// The account profile, which is the signed-in user and their profile. 
+// Reads the device copy first (works offline) and downloads it only when there is no copy on the device (#19).
 export type AccountProfile =
   | { status: "signed_out" }
   | { status: "loading"; user: AuthUser }
@@ -43,8 +45,10 @@ export function useAccountProfile(): AccountProfile {
     };
   }, [profiles, uid]);
 
+  // True once the device copy has been read and there isn't one for this user.
   const missingOnDevice = uid !== undefined && local?.uid === uid && local.profile === undefined;
 
+  // If the profile is missing on this device, try to download it. The download is retried when the user presses a retry button.
   useEffect(() => {
     if (!uid || !missingOnDevice) return;
     let active = true;
@@ -61,6 +65,14 @@ export function useAccountProfile(): AccountProfile {
     };
   }, [profiles, remoteProfiles, uid, missingOnDevice, attempt]);
 
+  // Work out the status, in order:
+  // - nobody signed in: signed_out
+  // - the device copy hasn't been read yet: loading
+  // - the device copy exists: ready
+  // - no device copy, and the download hasn't finished (or worked and the device copy
+  //   is about to reload): loading
+  // - the download found no profile anywhere: needs_username
+  // - the download failed: unavailable, with a retry that starts a new attempt
   if (!user) return { status: "signed_out" };
   if (local?.uid !== user.uid) return { status: "loading", user };
   if (local.profile) return { status: "ready", user, profile: local.profile };

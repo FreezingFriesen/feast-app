@@ -8,6 +8,8 @@ import { useSessionStatus } from "../SessionStatusProvider";
 // The Account tab when nobody is signed in.
 export function SignedOutSection() {
   const router = useRouter();
+  // If the user was just signed out (e.g. after 30 days), a note explaining why.
+  // null otherwise.
   const ended = sessionEndedMessage(useSessionStatus());
 
   return (

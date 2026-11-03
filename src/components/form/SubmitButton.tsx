@@ -23,6 +23,7 @@ export function SubmitButton({
 }: SubmitButtonProps) {
   const inactive = busy || disabled;
   const secondary = variant === "secondary";
+  // The button can't be pressed while busy or disabled, and fades out to show that.
   return (
     <Pressable
       onPress={onPress}
@@ -37,6 +38,7 @@ export function SubmitButton({
         inactive && styles.inactive,
       ]}
     >
+      {/* While busy: a spinner, and busyLabel (e.g. "Logging in…") instead of the label. */}
       <View style={styles.content}>
         {busy ? <ActivityIndicator color={secondary ? "#208AEF" : "#fff"} /> : null}
         <Text style={[styles.text, secondary && styles.secondaryText]}>{busy && busyLabel ? busyLabel : label}</Text>

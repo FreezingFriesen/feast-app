@@ -7,8 +7,10 @@ export type ChangePasswordResult =
   // field: which input the error belongs to (a wrong current password), if any.
   | { ok: false; error: AuthErrorCode; field?: "currentPassword" };
 
+// field: "password" when the error is a wrong password, so the screen marks that box.
 export type VerifyPasswordResult = { ok: true } | { ok: false; error: AuthErrorCode; field?: "password" };
 
+// The account actions for a signed-in user that need the password or an email.
 export type SecurityFlow = {
   // Re-authenticates with the current password (reauthSchema), e.g. the first step of
   // deleting the account. Needs a connection.
@@ -20,8 +22,10 @@ export type SecurityFlow = {
   resendVerificationEmail(): Promise<AuthResult>;
 };
 
+// Turns anything thrown into a failed result with a known auth error code.
 const fail = (error: unknown) => ({ ok: false, error: errorCodeIn(error, AUTH_ERROR_CODES) }) as const;
 
+// Each method returns a result and never throws, so screens only check result.ok.
 export function createSecurityFlow({ auth }: { auth: AuthService }): SecurityFlow {
   return {
     async verifyPassword(input) {

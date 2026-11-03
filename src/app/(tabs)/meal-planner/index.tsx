@@ -14,19 +14,26 @@ import { Stack } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 
+// The two tabs at the top of the planner. PlannerView is "month" or "week".
 const VIEWS = ["month", "week"] as const;
 type PlannerView = (typeof VIEWS)[number];
 
 export default function MealPlannerScreen() {
+  // Opens the day popup, the recipe picker, or the edit screen for a planned meal.
   const navigation = usePlannerNavigation();
+  // Every recipe, looked up by ID. Planned meals store only the recipe's ID.
   const recipesById = useRecipesById();
+  // Today's date as "YYYY-MM-DD".
   const today = todayKey();
+  // Which tab is showing. The planner opens on the Week tab.
   const [view, setView] = useState<PlannerView>("week");
   // The day both views are centred on. It is kept when switching between Month and Week.
   const [focusDate, setFocusDate] = useState(today);
 
   // Only load the entries the current view shows.
   const range = view === "month" ? monthBounds(focusDate) : weekBounds(focusDate);
+  // The planned meals, grouped by day and then into Breakfast, Lunch and Dinner.
+  // Updates by itself when a meal is added, moved or removed.
   const days = groupByDay(useMealPlanEntries(range.start, range.end));
 
   return (
@@ -50,8 +57,11 @@ export default function MealPlannerScreen() {
         }}
       />
       <ScrollView contentContainerStyle={styles.container}>
+        {/* The Month / Week switch. */}
         <SegmentedControl options={VIEWS} value={view} onChange={setView} />
 
+        {/* Month view: a calendar. Tapping a day selects it and opens that day's popup.
+            The arrows move back or forward a month. */}
         {view === "month" ? (
           <MonthGrid
             monthKey={focusDate}
@@ -65,6 +75,9 @@ export default function MealPlannerScreen() {
             onChangeMonth={(months) => setFocusDate(addMonths(focusDate, months))}
           />
         ) : (
+          // Week view: a row of days (with a dot on days that have meals), then the
+          // selected day's Breakfast, Lunch and Dinner slots. Tapping "Add" in a slot
+          // opens the recipe picker; tapping a meal opens it for editing.
           <>
             <WeekStrip
               selectedKey={focusDate}
@@ -73,6 +86,7 @@ export default function MealPlannerScreen() {
               hasMeals={(key) => days.has(key)}
             />
             <Text style={styles.dayTitle}>{formatDay(focusDate)}</Text>
+            {/* A day with nothing planned gets three empty slots. */}
             <DaySlots
               slots={days.get(focusDate) ?? emptyDaySlots()}
               recipesById={recipesById}

@@ -1,11 +1,13 @@
 import { StyleSheet, Text, View } from "react-native";
 
 type FormMessageProps = {
+  // error = red, info = blue, success = green.
   tone: "error" | "info" | "success";
   message: string;
 };
 
 // A message above or below a form. Screen readers announce it when it appears.
+// Errors are marked as alerts so they are read out straight away.
 export function FormMessage({ tone, message }: FormMessageProps) {
   return (
     <View
@@ -30,6 +32,7 @@ const styles = StyleSheet.create({
   },
 });
 
+// The border, background and text colours for each tone.
 const boxStyles = StyleSheet.create({
   error: { borderColor: "#c62828", backgroundColor: "#fdecea" },
   info: { borderColor: "#208AEF", backgroundColor: "#e8f3fd" },

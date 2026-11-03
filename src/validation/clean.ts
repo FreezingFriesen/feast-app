@@ -4,6 +4,7 @@
 
 export function cleanText(input: string): string {
   return input
+    // NFC makes accented letters consistent: "é" typed two different ways becomes one.
     .normalize("NFC")
     // remove control characters (keeps newline, carriage return, tab)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")

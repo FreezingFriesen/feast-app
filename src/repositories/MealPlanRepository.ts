@@ -6,6 +6,9 @@ export type MealPlanEntryData = z.output<typeof mealPlanEntrySchema>;
 
 // One recipe placed in one slot (date + meal type). Each entry is its own record,
 // so last-edit-wins sync works per entry rather than per week.
+// The extra fields are set by the repository, never by the user. Timestamps are in
+// milliseconds. deletedAt is only set once the entry is removed (soft delete), and
+// schemaVersion says which version of the data format the record uses.
 export type MealPlanEntry = MealPlanEntryData & {
   id: string;
   createdAt: number;
@@ -14,6 +17,8 @@ export type MealPlanEntry = MealPlanEntryData & {
   schemaVersion: number;
 };
 
+// What add() and update() return: the saved entry, or why it wasn't saved
+// (invalid data, a full slot, or an entry that no longer exists).
 export type MealPlanWriteResult =
   | { ok: true; entry: MealPlanEntry }
   | { ok: false; reason: "invalid"; error: z.ZodError }
@@ -30,6 +35,7 @@ export type MealPlanRepository = {
   remove(id: string): Promise<boolean>;
   // Entries from startDate to endDate (inclusive, "YYYY-MM-DD"), not soft-deleted, oldest first.
   listBetween(startDate: string, endDate: string): Promise<MealPlanEntry[]>;
+  // One entry, or undefined if it doesn't exist or was removed.
   getById(id: string): Promise<MealPlanEntry | undefined>;
   // Removes every entry from this device (logout wipe, account deletion).
   clear(): Promise<void>;

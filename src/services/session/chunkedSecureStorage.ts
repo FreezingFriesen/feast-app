@@ -18,6 +18,8 @@ export type ChunkedSecureStorage = {
   clear(): Promise<void>;
 };
 
+// The manifest says where an item's chunks are. Each item has two slots, "a" and "b",
+// and writes alternate between them (see the layout below).
 type Manifest = z.output<typeof chunkManifestSchema>;
 type Slot = Manifest["slot"];
 const SLOTS: readonly Slot[] = ["a", "b"];
@@ -29,6 +31,7 @@ export function encodeKey(key: string): string {
   return key.replace(/[^A-Za-z0-9-]/g, (char) => `_${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 
+// True for the first half of a character that JavaScript stores as two units (e.g. an emoji).
 const isHighSurrogate = (code: number) => code >= 0xd800 && code <= 0xdbff;
 
 // Chunks of at most `length` UTF-16 units, never split between the two halves of a
@@ -56,6 +59,7 @@ export function splitIntoChunks(value: string, length: number = SESSION_CHUNK_LE
 // A write fills the slot that isn't in use, then switches the manifest to it in a single
 // write, so a crash part way through leaves the previous value complete and readable.
 export function createChunkedSecureStorage(secure: SecureKeyValueStore, prefix: string): ChunkedSecureStorage {
+  // The secure storage key names, following the layout above.
   const indexKey = `${prefix}.index`;
   const manifestKey = (name: string) => `${prefix}.${name}.m`;
   const chunkKey = (name: string, slot: Slot, position: number) => `${prefix}.${name}.${slot}${position}`;
@@ -72,15 +76,18 @@ export function createChunkedSecureStorage(secure: SecureKeyValueStore, prefix: 
     }
   }
 
+  // An item's manifest, or null. The index, or an empty list if there isn't one.
   const readManifest = (name: string) => readJson(manifestKey(name), chunkManifestSchema);
   const readIndex = async () => (await readJson(indexKey, sessionItemIndexSchema)) ?? [];
 
+  // Deletes chunks 0 to count - 1 of one slot.
   async function deleteChunks(name: string, slot: Slot, count: number) {
     for (let position = 0; position < count; position += 1) {
       await secure.deleteItemAsync(chunkKey(name, slot, position));
     }
   }
 
+  // Adds a name to the index (if it isn't there), refusing to grow past MAX_SESSION_ITEMS.
   async function addToIndex(name: string) {
     const names = await readIndex();
     if (names.includes(name)) return;
@@ -90,6 +97,7 @@ export function createChunkedSecureStorage(secure: SecureKeyValueStore, prefix: 
     await secure.setItemAsync(indexKey, JSON.stringify([...names, name]));
   }
 
+  // Takes a name out of the index, deleting the index once it's empty.
   async function removeFromIndex(name: string) {
     const names = (await readIndex()).filter((existing) => existing !== name);
     if (names.length === 0) {
@@ -99,6 +107,7 @@ export function createChunkedSecureStorage(secure: SecureKeyValueStore, prefix: 
     }
   }
 
+  // Reads the manifest, then joins the chunks it points to back into one string.
   async function getItem(key: string): Promise<string | null> {
     const name = encodeKey(key);
     if (name.length > MAX_SESSION_ITEM_NAME_LENGTH) return null;
@@ -124,11 +133,13 @@ export function createChunkedSecureStorage(secure: SecureKeyValueStore, prefix: 
 
     // Record the name first, so clear() can always find what was written.
     await addToIndex(name);
+    // Write into whichever slot the current value isn't using.
     const current = await readManifest(name);
     const slot: Slot = current?.slot === "a" ? "b" : "a";
     for (let position = 0; position < chunks.length; position += 1) {
       await secure.setItemAsync(chunkKey(name, slot, position), chunks[position]);
     }
+    // This one write is the switch: from now on, reads use the new slot.
     const manifest: Manifest = { slot, count: chunks.length, length: value.length };
     await secure.setItemAsync(manifestKey(name), JSON.stringify(manifest));
 
@@ -164,6 +175,7 @@ export function createChunkedSecureStorage(secure: SecureKeyValueStore, prefix: 
 
   // One operation at a time, so concurrent calls from the auth SDK can't interleave
   // index updates or read a value while it is being replaced.
+  // Each call waits for the one before it to finish. A failure doesn't block the queue.
   let queue: Promise<unknown> = Promise.resolve();
   function serial<T>(operation: () => Promise<T>): Promise<T> {
     const result = queue.then(operation);

@@ -6,6 +6,7 @@ export function useOnline(): boolean | null {
   const connectivity = useConnectivity();
   const [online, setOnline] = useState<boolean | null>(null);
 
+  // Check the connectivity status on mount and subscribe to changes. The subscription is cleaned up on unmount.
   useEffect(() => {
     let active = true;
     const update = (value: boolean) => {

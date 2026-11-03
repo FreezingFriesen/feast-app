@@ -21,21 +21,28 @@ import { AccountSection } from "./AccountSection";
 // updatedAt is set by the repository and sync uploads it later (last edit wins).
 export function DietaryRestrictionsSection({ profile }: { profile: Profile }) {
   const profiles = useProfileRepository();
+  // What's saved now. null means the user hasn't set them yet.
   const saved = profile.dietaryRestrictions;
+
   // The user's picks. savedAt is set once they're saved, and the draft is shown until
   // the profile reloads with that save (so the chips don't flash back to the old choices).
   const [draft, setDraft] = useState<{ values: DietaryFormValues; savedAt: number | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  // Show the draft while it has unsaved changes, or until the profile catches up with the save.
   const showingDraft = draft !== null && (draft.savedAt === null || profile.updatedAt < draft.savedAt);
+  // The chips that are highlighted on screen.
   const values = showingDraft ? draft.values : toDietaryFormValues(saved);
+  // Saved, but the profile hasn't reloaded yet. The button stays disabled meanwhile.
   const waitingForReload = showingDraft && draft.savedAt !== null;
 
+  // Update the draft values when the user toggles a chip. This doesn't save to the repository yet.
   function update(next: DietaryFormValues) {
     setMessage(null);
     setDraft({ values: next, savedAt: null });
   }
 
+  // Runs when the save button is pressed. Saves the picks to the profile on this phone.
   async function handleSave() {
     // Form check for instant feedback; the repository validates again before writing.
     const parsed = dietaryRestrictionsSchema.safeParse(values);
@@ -46,6 +53,7 @@ export function DietaryRestrictionsSection({ profile }: { profile: Profile }) {
     setSaving(true);
     try {
       const result = await profiles.setDietaryRestrictions(profile.uid, parsed.data);
+      // Keep showing what was saved (marked with its save time) until the profile reloads.
       if (result.ok) {
         setDraft({
           values: toDietaryFormValues(result.profile.dietaryRestrictions),
@@ -60,6 +68,9 @@ export function DietaryRestrictionsSection({ profile }: { profile: Profile }) {
     }
   }
 
+  // The section shows the saved choices, a note about how they are used, and the chip selects for allergies and diets.
+  // If the user hasn't set any yet, it shows an info message. The save button is disabled if there are no changes or if the profile
+  // is waiting to reload after a save. Before anything is set, the button reads "I don't have any" until a chip is picked.
   return (
     <AccountSection title="Dietary restrictions">
       <Text style={styles.summary}>{describeRestrictions(saved)}</Text>

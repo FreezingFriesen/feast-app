@@ -4,6 +4,8 @@ import type { recipeSchema } from "@/validation/recipeSchema";
 // The cleaned, validated recipe fields (output of recipeSchema).
 export type RecipeData = z.output<typeof recipeSchema>;
 
+// A saved recipe. The extra fields are set by the repository, never by the user.
+// Timestamps are in milliseconds; deletedAt is only set once it is deleted (soft delete).
 export type Recipe = RecipeData & {
   id: string;
   createdAt: number;
@@ -12,6 +14,7 @@ export type Recipe = RecipeData & {
   schemaVersion: number;
 };
 
+// What create() returns: the saved recipe, or the validation errors.
 export type CreateRecipeResult =
   | { ok: true; recipe: Recipe }
   | { ok: false; error: z.ZodError };
@@ -23,6 +26,7 @@ export type RecipeRepository = {
   create(input: unknown): Promise<CreateRecipeResult>;
   // Returns recipes that are not soft-deleted, newest first.
   list(): Promise<Recipe[]>;
+  // One recipe, or undefined if it doesn't exist or was deleted.
   getById(id: string): Promise<Recipe | undefined>;
   // Removes every recipe from this device (logout wipe, account deletion).
   clear(): Promise<void>;

@@ -1,6 +1,7 @@
 // N-15: a session lasts 30 days from the login date stored on the device.
 export const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+// The answer for one login date: still active, expired, or can't be trusted.
 export type SessionStatus =
   | { state: "active"; loginAt: number; expiresAt: number }
   | { state: "expired"; loginAt: number; expiresAt: number }
@@ -20,6 +21,8 @@ export function createSessionPolicy(
   maxAgeMs: number = SESSION_MAX_AGE_MS,
 ): SessionPolicy {
   return {
+    // No usable login date -> invalid. Clock earlier than the login -> invalid.
+    // 30 days or more since login -> expired. Otherwise -> active.
     evaluate(loginAt) {
       if (loginAt === null || !Number.isFinite(loginAt)) {
         return { state: "invalid", reason: "missing" };

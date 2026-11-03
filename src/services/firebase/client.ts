@@ -8,6 +8,8 @@ import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, getReactNativePersistence, initializeAuth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
+// The three Firebase objects the services will use: the app, login (auth) and the
+// Firestore database.
 export type FirebaseClient = {
   app: FirebaseApp;
   auth: ReturnType<typeof getAuth>;
@@ -40,6 +42,8 @@ export function firebaseConfigFromEnv(): FirebaseConfig {
   return result.data;
 }
 
+// Connects to the Firebase project. Only the Firebase versions of our services will
+// call this; screens never do.
 export function createFirebaseClient({
   authStorage,
   config = firebaseConfigFromEnv(),
