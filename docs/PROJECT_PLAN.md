@@ -76,22 +76,25 @@ N-06 is waiting on ingredient price data.
 - [ ] #19 Store recipes and app data on the account; restore on a new device
 - [ ] N-19 Local-first sync: changes saved on device, synced to Firebase on reconnect, last edit wins
 
-Status: The Firebase project isn't available yet, so the Account tab is built
-against an in-memory backend behind the same interfaces. Done so far: validation,
-interfaces, domain errors, the 30-day session, chunked secure token storage, the
-in-memory auth and username backend with a shared contract test suite, the SQLite
-profile cache and the composition root. Built against the in-memory backend:
+Status: The Account tab runs on either backend, chosen by `EXPO_PUBLIC_BACKEND`:
+the in-memory fake (the default) or real Firebase Auth and Firestore. Done so far:
+validation, interfaces, domain errors, the 30-day session, chunked secure token
+storage, the SQLite profile cache and the composition root, plus:
 - signed-out screens: log in, sign up, forgot password, choose username
 - signed-in page: profile, dietary restrictions, sync status, session info,
   change password, log out
 - delete account: re-authenticate, typed username, retry-safe deletion
+- Firebase services, proven on the emulators by the same contract suite as the fake
+  (`npm run test:backend`)
 
-Nothing is ticked until it works against Firebase. N-18 is local only until sync
+Nothing is ticked until a person confirms it on the real Firebase project (see "When
+the Firebase project is connected" in Open items). N-18 is local only until sync
 exists. Account tab phases:
 3. signed-out UI (done)
 4. signed-in UI (done)
 5. delete account (done)
-6. Firebase, Security Rules and rules tests (blocked until the database exists)
+6. Firebase, Security Rules and rules tests (built and passing on the emulators; the
+   checks on the real project are still to do)
 
 ### Offline
 - [ ] N-20 Stored recipes, meal planning and grocery list generation all work fully offline
@@ -131,8 +134,18 @@ exists. Account tab phases:
   only in `src/services/AppProviders.tsx`. Implementations are picked only in
   `src/services/createAppServices.ts`. The in-memory backend is a development fake
   that forgets everything on reload. Production builds refuse it, and unknown values
-  are refused. `firebase` is a stub that fails with `backend_not_configured` until
-  Phase 6.
+  are refused. `firebase` needs the six Firebase values in `.env.local` (see
+  `.env.example`), or startup fails with `backend_not_configured`. With `memory`, the
+  Firebase SDK never runs and nothing reads those values.
+- **Firestore with no connection:** the SDK queues writes, and their promises stay
+  pending forever, and list reads answer "empty" from its cache. So the services read
+  from the server only, and every call checks the connection first and gives up after
+  15 seconds, reporting `offline` (`src/services/firebase/firestoreCalls.ts`). Firestore's
+  own offline storage stays off: SQLite is our local store.
+- **Guardrails:** lint refuses the Firebase SDK outside `src/services/firebase/`, the
+  four `firebase*.ts` services, `src/testing/` and `firestore-tests/`, and `firebase-admin`
+  outside `scripts/`. A test fails if an `EXPO_PUBLIC_` name appears beyond the seven
+  in `.env.example`.
 - **Domain errors:** expected failures are typed results. Anything an implementation
   throws is a `DomainError` (`src/services/domainErrors.ts`): a plain `Error` with a
   `code`, not a subclass. Screens never see Firebase error codes.
@@ -255,25 +268,46 @@ To be planned.
   sign up stopped half way has to choose a username first.
 - Should Recipes, Meal Planner and Grocery List require being signed in? Today an
   expired session doesn't block them.
-- When the Firebase project is connected (Account Phase 6), check:
-  1. The Firebase services get their client from
-     `createFirebaseClient({ authStorage: sessionStore.authStorage })`
-     (`src/services/firebase/client.ts`), so auth persistence is the chunked secure
-     storage, never AsyncStorage; the session survives a restart; an iOS reinstall
-     doesn't bring back an old session.
-  2. The real SecureStore token size on iOS and Android fits the chunked storage, and
-     sign-out removes every `feast.session.auth.*` key.
-  3. Security Rules for `users/{uid}`, `usernames/{name}`, recipes and meal plan
-     entries mirror the schema limits, with emulator tests. The emulator runs here with
-     a `demo-` project ID. Zod counts code points, but in the emulator Rules `size()`
-     counts UTF-16 units (an emoji is 2), so text lengths are checked with a regex
-     (`validText` in `firestore.rules`). Re-check on the real project that a 500-emoji
-     description is accepted and 501 is refused.
-  4. Account deletion removes the subcollections (batches of 500 or fewer), releases
-     the username, deletes `users/{uid}`, then deletes the auth user, and a retry after
-     a failure at any step finishes. Check in the console that nothing is left.
-  5. Restore on a new device downloads and validates the profile and data.
-  6. The shared contract suite (`src/testing/contracts/`) passes against the emulators.
+- When the Firebase project is connected (Account Phase 6), a person must check these
+  on a real phone and the real project. The emulator tests can't show them. Set
+  `EXPO_PUBLIC_BACKEND=firebase` and the six Firebase values in `.env.local`.
+  1. **Sessions:** log in, restart the app, and you're still logged in. If you're logged
+     out on every launch, Firebase couldn't use the secure storage. On iOS, an uninstall
+     and reinstall may bring back the old session, because keychain data can survive
+     (no install marker is built yet).
+  2. **SecureStore token size:** the real session fits the chunked storage on iOS and
+     Android, with no size warnings, and logging out removes every
+     `feast.session.auth.*` key.
+  3. **Deployed rules:** deploy `firestore.rules` (a person does this, not a script), then
+     re-check on the live rules that a 500-emoji description is accepted and 501 is
+     refused. Zod counts code points; in the emulator, Rules `size()` counts UTF-16 units
+     (an emoji is 2), so text lengths use a regex (`validText`).
+  4. **Account deletion:** on the real project, deleting an account leaves nothing in the
+     console (`users`, `usernames`, `recipes`, `mealPlanEntries`, the Auth user), and the
+     email and username can be used again. The real project enforces "recent login"; the
+     emulators don't.
+  5. **Restore on a new device:** log in on a second phone and the profile downloads.
+     Recipes and meal plans need the sync engine (N-19, #19).
+  6. **Real behaviour the emulators can't show:** turn on email enumeration protection
+     and a minimum-8 password policy in the console, then check that a wrong password and
+     an unknown email give the same message, password reset gives the same answer, the
+     reset and verification emails arrive, and too many wrong passwords shows the
+     rate-limit message. Check airplane mode on a real phone.
+
+  Already passing on the emulators, no need to repeat: every rule path
+  (`npm run test:rules`), and the contract suite plus the two-accounts race, full
+  deletion with a retry after a failure at each step, and 1,200-recipe delete
+  (`npm run test:backend`).
+- Known limits of the Firebase services:
+  - A phone clock more than 5 minutes fast can't claim a username. The rules refuse the
+    future timestamp, and any refusal of the claim is reported as "name taken".
+  - A claim that timed out stays queued in the SDK and can still land later. The user
+    may get the name after all, and the next profile refresh picks that up.
+  - Email-verified status only updates on the next sign-in. `AuthService` has no reload.
+  - The planned 30-day `auth_time` check isn't in the rules, so sessions are limited on
+    the phone only.
+  - Skipped on the emulators, run in memory only (no fake clock or forced failures there):
+    the nine contract tests listed in `src/testing/contracts/firebaseHarness.ts`.
 - Security Rules can't check the items inside a list (no loops), so for recipes they
   check only each list's type and size. Not checked on the server: each ingredient
   row (keys, name, quantity, unit, note, ingredientId), each step's length, `cleanText`

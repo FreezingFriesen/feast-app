@@ -3,7 +3,6 @@
 // emulator and no Java. They run in plain Node, where the Firebase SDK talks to the
 // emulators, with the same Babel preset the normal tests use for TypeScript.
 module.exports = {
-  rootDir: __dirname,
   testEnvironment: "node",
   testMatch: ["<rootDir>/src/testing/emulator/**/*.emulator.ts"],
   transform: {
