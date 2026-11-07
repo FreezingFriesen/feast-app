@@ -1,0 +1,6 @@
+id,name,aliases,category,grams_per_cup,grams_per_piece,piece_description,package_price,package_size,package_unit,price_source,price_collected_at,currency,region,calories_per_100g,protein_g,carbs_g,fat_g,saturated_fat_g,fiber_g,sugar_g,sodium_mg,nutrition_source,allergens,diet_tags,last_updated,Substitutes
+fixture_flour,All-purpose flour,flour;white flour,pantry,125,,,4.99,2.5,kg,Test Store,2026-10-13,CAD,Alberta,364,10.3,76.3,1,0.2,2.7,0.3,2,Test Nutrition Data,wheat,vegan;vegetarian,2026-10-13,bread flour
+fixture_egg,"Egg, whole, raw",eggs,dairy_eggs,,50,"1 large egg, shelled",4.23,12,each,Test Store,2026-10-13,CAD,Alberta,142.9,12.5,1.7,10.7,2.7,0,0,125,Test Nutrition Data,eggs,vegetarian,2026-10-13,
+fixture_onion,Yellow onion,onion,produce,160,110,1 medium onion,3.49,3,lbs,Test Store,10/13/2026,CAD,Alberta,40,1.1,9.3,0.1,0,1.7,4.2,4,Test Nutrition Data,,vegan,2026-10-13,shallot
+fixture_almond,Whole almonds,almonds,pantry,143,,,8.99,400,g,Test Store,2026-10-13,CAD,Alberta,579,21.2,21.6,49.9,3.8,12.5,4.4,1,Test Nutrition Data,tree nuts,vegan,2026-10-13,
+fixture_candy,Not a real category,,candy,,,,1.99,100,g,Test Store,2026-10-13,CAD,Alberta,400,0,100,0,0,0,90,0,Test Nutrition Data,,,2026-10-13,

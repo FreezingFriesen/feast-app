@@ -111,6 +111,10 @@ describe("ingredientSchema", () => {
     ["dietTags", ["paleo"]],
     ["packageUnit", "mg"],
     ["packageUnit", "oz"],
+    // The importer corrects these three before checking; the schema itself stays strict.
+    ["packageUnit", "lbs"],
+    ["allergens", ["tree nuts"]],
+    ["allergens", ["peanut"]],
     ["category", "candy"],
     ["currency", "USD"],
     ["region", "Ontario"],

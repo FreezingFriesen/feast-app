@@ -157,6 +157,13 @@ exists. Account tab phases:
 - **Nutrition/price data:** API key stays server-side. A script or Cloud Function
   pulls from the API, validates, and writes to Firestore. The app only reads
   Firestore and caches it.
+- **Ingredient import:** `npm run import:ingredients -- <file.csv> --dry-run` checks a
+  CSV with no credentials or network. `--write` does the import, and refuses a key inside
+  the repo. The script never opens the key: the Firebase admin library reads it from
+  `GOOGLE_APPLICATION_CREDENTIALS`. Exactly three known spellings are corrected first
+  (`lbs`, `tree nuts`, `peanut`), and each fix is printed; `ingredientSchema` stays strict
+  and rejects them if given them directly. Columns the schema doesn't have are named and
+  ignored. A missing `allergens_reviewed` column means false.
 - **Dev build later:** after the capstone, switch to React Native Firebase and an
   EAS development build; add payments.
 
@@ -229,6 +236,14 @@ To be planned.
 - Choose the nutrition API and confirm its terms.
 - Define the ingredient data format (feeds cost, nutrition, unit conversion,
   diet/allergen tags and filters).
+- Edwin's CSV (`ingredients list v5.csv`) dry-runs to 199 valid and 1 skipped. Still to do:
+  - Fix the id on line 140 (`roll_dinner_+A148+A140`).
+  - Decide whether the `Substitutes` column becomes a field. Today it's ignored, and
+    adding it is a data model change.
+  - Every row has `allergens_reviewed` false, because the column isn't in the file, so
+    the app must show "allergens unknown" until someone reviews them.
+  - Nobody has run the real import yet. It needs the real project and a key kept outside
+    the repo, and the app doesn't read ingredients yet.
 - Decide whether local data is wiped on logout (shared devices).
 - Account defaults to confirm, all in `src/services/account/accountDecisions.ts`:
   log out wipes local data after confirmation; session expiry signs out but keeps
