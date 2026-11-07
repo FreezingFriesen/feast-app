@@ -13,7 +13,7 @@ jest.mock("firebase/auth", () => ({
   getReactNativePersistence: jest.fn(),
   initializeAuth: jest.fn(),
 }));
-jest.mock("firebase/firestore", () => ({ getFirestore: jest.fn() }));
+jest.mock("firebase/firestore", () => ({ getFirestore: jest.fn(), initializeFirestore: jest.fn() }));
 
 type Mocked = Record<string, jest.Mock>;
 const appSdk = jest.requireMock<Mocked>("firebase/app");
@@ -40,7 +40,7 @@ beforeEach(() => {
   appSdk.initializeApp.mockReturnValue(app);
   authSdk.getReactNativePersistence.mockReturnValue(persistence);
   authSdk.initializeAuth.mockReturnValue(auth);
-  firestoreSdk.getFirestore.mockReturnValue(db);
+  firestoreSdk.initializeFirestore.mockReturnValue(db);
 });
 
 const authStorage = () => createChunkedSecureStorage(createMemorySecureKeyValue().store, "feast.session.auth");
@@ -67,6 +67,25 @@ describe("createFirebaseClient", () => {
     expect(createFirebaseClient({ authStorage: authStorage(), config }).auth).toBe(existingAuth);
     expect(appSdk.initializeApp).not.toHaveBeenCalled();
     expect(authSdk.getAuth).toHaveBeenCalledWith(app);
+  });
+
+  it("creates Firestore with long-polling detection and no persistence", () => {
+    createFirebaseClient({ authStorage: authStorage(), config });
+    // Only this setting: nothing turns on Firestore's own offline storage (SQLite is ours).
+    expect(firestoreSdk.initializeFirestore).toHaveBeenCalledTimes(1);
+    expect(firestoreSdk.initializeFirestore).toHaveBeenCalledWith(app, { experimentalAutoDetectLongPolling: true });
+    expect(firestoreSdk.getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("reuses Firestore after a fast refresh", () => {
+    const existingDb = { name: "existing db" };
+    firestoreSdk.initializeFirestore.mockImplementation(() => {
+      throw new Error("already initialized");
+    });
+    firestoreSdk.getFirestore.mockReturnValue(existingDb);
+
+    expect(createFirebaseClient({ authStorage: authStorage(), config }).db).toBe(existingDb);
+    expect(firestoreSdk.getFirestore).toHaveBeenCalledWith(app);
   });
 });
 

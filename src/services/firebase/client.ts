@@ -1,14 +1,14 @@
 // src/services/firebase/client.ts
-// Not used yet: the Firebase services are built in Account Phase 6 (docs/PROJECT_PLAN.md).
+// Connects to the Firebase project. Used only when EXPO_PUBLIC_BACKEND is "firebase".
 import { domainError } from "@/services/domainErrors";
 import type { ChunkedSecureStorage } from "@/services/session/chunkedSecureStorage";
 import { firebaseConfigSchema, type FirebaseConfig } from "@/validation/configSchema";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 // @ts-ignore  (some firebase versions have a known typing gap for this export; it works at runtime)
 import { getAuth, getReactNativePersistence, initializeAuth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, type Firestore } from "firebase/firestore";
 
-// The three Firebase objects the services will use: the app, login (auth) and the
+// The three Firebase objects the services use: the app, login (auth) and the
 // Firestore database.
 export type FirebaseClient = {
   app: FirebaseApp;
@@ -42,7 +42,7 @@ export function firebaseConfigFromEnv(): FirebaseConfig {
   return result.data;
 }
 
-// Connects to the Firebase project. Only the Firebase versions of our services will
+// Connects to the Firebase project. Only the Firebase versions of our services
 // call this; screens never do.
 export function createFirebaseClient({
   authStorage,
@@ -63,5 +63,15 @@ export function createFirebaseClient({
     auth = getAuth(app);
   }
 
-  return { app, auth, db: getFirestore(app) };
+  // The default streaming connection can hang on React Native, so let the SDK detect
+  // when it has to long-poll. Firestore persistence stays off: SQLite is our local store.
+  let db: Firestore;
+  try {
+    db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+  } catch {
+    // Already initialized (fast refresh), so reuse it
+    db = getFirestore(app);
+  }
+
+  return { app, auth, db };
 }

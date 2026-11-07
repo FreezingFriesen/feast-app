@@ -5,6 +5,31 @@ import { createNodeSqliteDatabase } from "@/testing/nodeSqliteDatabase";
 import type { Backend } from "@/validation/configSchema";
 import { createAppServices, resolveBackend } from "../createAppServices";
 
+// A pretend Firebase SDK. Each factory notes that it ran, so a test can prove which
+// backend actually loaded the SDK.
+jest.mock("firebase/app", () => {
+  (globalThis as { firebaseSdkLoaded?: boolean }).firebaseSdkLoaded = true;
+  return { getApps: jest.fn(() => []), getApp: jest.fn(), initializeApp: jest.fn(() => ({})) };
+});
+jest.mock("firebase/auth", () => ({
+  EmailAuthProvider: { credential: jest.fn() },
+  getAuth: jest.fn(),
+  getReactNativePersistence: jest.fn(() => ({})),
+  initializeAuth: jest.fn(() => ({ currentUser: null })),
+  onAuthStateChanged: jest.fn(),
+}));
+jest.mock("firebase/firestore", () => ({ getFirestore: jest.fn(), initializeFirestore: jest.fn(() => ({})) }));
+
+// Read only inside the firebase tests: requiring these is what loads the pretend SDK.
+const sdkLoaded = {
+  get app() {
+    return jest.requireMock<Record<string, jest.Mock>>("firebase/app");
+  },
+  get auth() {
+    return jest.requireMock<Record<string, jest.Mock>>("firebase/auth");
+  },
+};
+
 describe("resolveBackend", () => {
   it.each([
     [undefined, true, "memory"],
@@ -62,18 +87,42 @@ describe("createAppServices with the in-memory backend", () => {
     expect(await repositories.profiles.get(signUp.user.uid)).toBeUndefined();
   });
 
+  it("never loads the Firebase SDK or reads the Firebase values", async () => {
+    await setup("memory");
+    expect((globalThis as { firebaseSdkLoaded?: boolean }).firebaseSdkLoaded).toBeUndefined();
+  });
+
   it("starts with the stub sync status", async () => {
     const { services } = await setup("memory");
     expect(services.sync.getStatus()).toMatchObject({ state: "unavailable", pendingChanges: 0 });
   });
 });
 
-describe("createAppServices with the firebase backend (not configured yet)", () => {
-  it("fails loudly on the remote side but keeps local data working", async () => {
-    const { services, repositories, devControls } = await setup("firebase");
+describe("createAppServices with the firebase backend", () => {
+  const FIREBASE_VALUES = {
+    EXPO_PUBLIC_FIREBASE_API_KEY: "test-api-key_0123456789",
+    EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: "feast-demo.firebaseapp.com",
+    EXPO_PUBLIC_FIREBASE_PROJECT_ID: "feast-demo",
+    EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: "feast-demo.firebasestorage.app",
+    EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "123456789012",
+    EXPO_PUBLIC_FIREBASE_APP_ID: "1:123456789012:web:abcdef0123456789",
+  };
+  // Changed in place, not replaced: Expo's env module keeps hold of the original object.
+  afterEach(() => {
+    for (const name of Object.keys(FIREBASE_VALUES)) delete process.env[name];
+  });
+
+  it("fails with backend_not_configured when the Firebase values are missing, before connecting", async () => {
+    for (const name of Object.keys(FIREBASE_VALUES)) delete process.env[name];
+    await expect(setup("firebase")).rejects.toMatchObject({ name: "DomainError", code: "backend_not_configured" });
+    expect(sdkLoaded.app.initializeApp).not.toHaveBeenCalled();
+  });
+
+  it("keeps Firebase's session in the session store's secure storage, and has no dev controls", async () => {
+    Object.assign(process.env, FIREBASE_VALUES);
+    const { services, devControls } = await setup("firebase");
     expect(devControls).toBeNull();
-    await expect(services.auth.whenReady()).rejects.toMatchObject({ code: "backend_not_configured" });
-    await expect(services.usernames.isAvailable("levi_f")).rejects.toMatchObject({ code: "backend_not_configured" });
-    expect(await repositories.recipes.list()).toEqual([]);
+    expect(sdkLoaded.auth.getReactNativePersistence).toHaveBeenCalledTimes(1);
+    expect(sdkLoaded.auth.getReactNativePersistence.mock.calls[0][0]).toBe(services.sessionStore.authStorage);
   });
 });

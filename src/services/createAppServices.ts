@@ -7,24 +7,21 @@ import type { SqlDatabase } from "@/storage/SqlDatabase";
 import { backendSchema, type Backend } from "@/validation/configSchema";
 import { createLocalDataWiper } from "./account/LocalDataWiper";
 import type { AuthService } from "./auth/AuthService";
-import { createFirebaseAuthService } from "./auth/firebaseAuthService";
 import { createInMemoryAuthService } from "./auth/inMemoryAuthService";
 import { createInMemoryServer, type InMemoryServerControls } from "./backend/inMemoryServer";
 import type { ConnectivityService } from "./connectivity/ConnectivityService";
 import { domainError } from "./domainErrors";
-import { createFirebaseRemoteProfileStore } from "./profiles/firebaseRemoteProfileStore";
 import { createInMemoryRemoteProfileStore } from "./profiles/inMemoryRemoteProfileStore";
 import type { RemoteProfileStore } from "./profiles/RemoteProfileStore";
 import type { Services } from "./ServiceProvider";
+import type { ChunkedSecureStorage } from "./session/chunkedSecureStorage";
 import { createSecureSessionStore } from "./session/SecureSessionStore";
 import type { SecureKeyValueStore } from "./session/secureKeyValue";
 import { createSessionGuard } from "./session/sessionGuard";
 import { createSessionPolicy } from "./session/SessionPolicy";
 import { createStubSyncService } from "./sync/stubSyncService";
-import { createFirebaseRemoteUserContent } from "./userData/firebaseRemoteUserContent";
 import { createInMemoryRemoteUserContent } from "./userData/inMemoryRemoteUserContent";
 import type { RemoteUserContent } from "./userData/RemoteUserContent";
-import { createFirebaseUsernameRegistry } from "./usernames/firebaseUsernameRegistry";
 import { createInMemoryUsernameRegistry } from "./usernames/inMemoryUsernameRegistry";
 import type { UsernameRegistry } from "./usernames/UsernameRegistry";
 
@@ -71,17 +68,25 @@ type Remote = {
   devControls: InMemoryServerControls | null;
 };
 
-// Builds the server-side services for the chosen backend. "firebase" gives the stubs
-// (they fail until Phase 6); "memory" gives fakes that share one pretend server.
-function createRemote(backend: Backend, connectivity: ConnectivityService, now: () => number, latencyMs: number): Remote {
+// What the server-side services need from createAppServices.
+type RemoteOptions = {
+  backend: Backend;
+  // Where Firebase keeps its session: secure storage, never AsyncStorage (N-15).
+  authStorage: ChunkedSecureStorage;
+  connectivity: ConnectivityService;
+  now: () => number;
+  latencyMs: number;
+};
+
+// Builds the server-side services for the chosen backend: the real Firebase ones, or
+// fakes that share one pretend server.
+function createRemote({ backend, authStorage, connectivity, now, latencyMs }: RemoteOptions): Remote {
   if (backend === "firebase") {
-    return {
-      auth: createFirebaseAuthService(),
-      usernames: createFirebaseUsernameRegistry(),
-      remoteProfiles: createFirebaseRemoteProfileStore(),
-      remoteContent: createFirebaseRemoteUserContent(),
-      devControls: null,
-    };
+    // Loaded here, not at the top of this file, so with "memory" the Firebase SDK never
+    // runs and nothing reads the Firebase variables.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createFirebaseRemote } = require("./firebase/firebaseRemote") as typeof import("./firebase/firebaseRemote");
+    return { ...createFirebaseRemote({ authStorage, connectivity, now }), devControls: null };
   }
   const server = createInMemoryServer({ connectivity, latencyMs, now });
   return {
@@ -111,15 +116,17 @@ export function createAppServices({
     profiles: createSqliteProfileRepository(database, now),
   };
 
-  const { auth, usernames, remoteProfiles, remoteContent, devControls } = createRemote(
+  // The 30-day session: where the login date is kept, and the rule that checks it. Built
+  // first, because Firebase keeps its own session in this store's secure storage.
+  const sessionStore = createSecureSessionStore(secure);
+  const sessionPolicy = createSessionPolicy(now);
+  const { auth, usernames, remoteProfiles, remoteContent, devControls } = createRemote({
     backend,
+    authStorage: sessionStore.authStorage,
     connectivity,
     now,
     latencyMs,
-  );
-  // The 30-day session: where the login date is kept, and the rule that checks it.
-  const sessionStore = createSecureSessionStore(secure);
-  const sessionPolicy = createSessionPolicy(now);
+  });
   // Clears every repository on this phone (log out, account deletion).
   const localData = createLocalDataWiper([repositories.profiles, repositories.recipes, repositories.mealPlans]);
 

@@ -1,5 +1,5 @@
-import { createFirebaseAuthService } from "@/services/auth/firebaseAuthService";
 import { createTestDevice, createTestServer } from "@/testing/accountTestBed";
+import { createThrowingAuthService } from "@/testing/fakes/throwingAuthService";
 import { createSignInFlow } from "../signInFlow";
 
 const signUpForm = {
@@ -90,7 +90,7 @@ describe("sign in flow (N-14)", () => {
 
   it("turns errors thrown by a backend into a result", async () => {
     const { phone } = await setupWithAccount();
-    const flow = createSignInFlow({ ...phone, auth: createFirebaseAuthService() });
+    const flow = createSignInFlow({ ...phone, auth: createThrowingAuthService() });
     expect(await flow.signIn(credentials)).toEqual({ status: "failed", error: "unknown" });
     expect(await flow.sendPasswordReset({ email: "levi@example.com" })).toEqual({ ok: false, error: "unknown" });
   });

@@ -1,5 +1,5 @@
-import { createFirebaseAuthService } from "@/services/auth/firebaseAuthService";
 import { createTestDevice, createTestServer } from "@/testing/accountTestBed";
+import { createThrowingAuthService } from "@/testing/fakes/throwingAuthService";
 import { createSecurityFlow } from "../securityFlow";
 
 const OLD = "correct horse battery";
@@ -117,7 +117,7 @@ describe("resend verification email", () => {
   });
 
   it("turns errors thrown by a backend into a result", async () => {
-    const flow = createSecurityFlow({ auth: createFirebaseAuthService() });
+    const flow = createSecurityFlow({ auth: createThrowingAuthService() });
     expect(await flow.resendVerificationEmail()).toEqual({ ok: false, error: "unknown" });
     expect(await flow.changePassword(change)).toEqual({ ok: false, error: "unknown" });
   });

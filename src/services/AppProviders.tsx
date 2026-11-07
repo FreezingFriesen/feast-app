@@ -30,8 +30,8 @@ async function startApp(): Promise<AppServices> {
     connectivity: createExpoNetworkConnectivity(),
     latencyMs: backend === "memory" ? DEV_LATENCY_MS : 0,
   });
-  // Restores a saved session. The Firebase stub fails here, so an unconfigured
-  // backend shows the error screen straight away.
+  // Restores a saved session before the first screen. (A missing Firebase setting has
+  // already failed above, in createAppServices, which shows the error screen.)
   await app.services.auth.whenReady();
   return app;
 }
@@ -67,7 +67,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         title="No backend configured"
         description={
           __DEV__
-            ? "Set EXPO_PUBLIC_BACKEND to memory (the default) until the Firebase backend exists."
+            ? "Check EXPO_PUBLIC_BACKEND and the Firebase values in .env.local, then restart with: npx expo start -c"
             : "This build isn't connected to a backend."
         }
       />
