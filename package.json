@@ -56,7 +56,8 @@
     "lint": "expo lint",
     "test": "jest",
     "import:ingredients": "tsx scripts/importIngredients.ts",
-    "test:rules": "npx firebase-tools@15 emulators:exec --only firestore --project demo-feast \"node --test firestore-tests/*.test.mjs\""
+    "test:rules": "npx firebase-tools@15 emulators:exec --only firestore --project demo-feast \"node --test firestore-tests/*.test.mjs\"",
+    "test:backend": "npx firebase-tools@15 emulators:exec --only auth,firestore --project demo-feast \"jest --config jest.emulator.config.js\""
   },
   "jest": {
     "preset": "jest-expo",

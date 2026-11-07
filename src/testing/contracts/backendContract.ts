@@ -1,5 +1,5 @@
-// Shared behaviour every AuthService and UsernameRegistry implementation must have.
-// Run against the in-memory backend now; point a Firebase emulator harness at it in Phase 6.
+// Shared behaviour every backend implementation must have.
+// Runs against the in-memory backend (npm test) and the Firebase emulators (npm run test:backend).
 import type { AuthService, AuthUser, AuthUserResult } from "@/services/auth/AuthService";
 import type { InMemoryOperation } from "@/services/backend/inMemoryServer";
 import { isDomainError, type DomainErrorCode } from "@/services/domainErrors";
