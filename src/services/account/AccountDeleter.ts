@@ -3,6 +3,7 @@ import type { AuthService } from "@/services/auth/AuthService";
 import { isDomainError, type DomainErrorCode } from "@/services/domainErrors";
 import type { RemoteProfileStore } from "@/services/profiles/RemoteProfileStore";
 import type { SessionGuard } from "@/services/session/sessionGuard";
+import type { SyncService } from "@/services/sync/SyncService";
 import type { RemoteUserContent } from "@/services/userData/RemoteUserContent";
 import type { UsernameRegistry } from "@/services/usernames/UsernameRegistry";
 import { deleteAccountSchema } from "@/validation/authSchema";
@@ -34,7 +35,8 @@ export type AccountDeleter = {
 };
 
 // Everything deletion touches: the login, the username, the server copies, the
-// phone's copy, the 30-day session and the phone's local data.
+// phone's copy, the 30-day session and the phone's local data. Sync is stopped first,
+// so it can't upload the content again after it is deleted.
 type AccountDeleterDependencies = {
   auth: AuthService;
   usernames: UsernameRegistry;
@@ -43,6 +45,7 @@ type AccountDeleterDependencies = {
   profiles: ProfileRepository;
   sessionGuard: SessionGuard;
   localData: LocalDataWiper;
+  sync: Pick<SyncService, "stop">;
 };
 
 // Creates an account deleter that runs the steps in order, and returns the step that failed if any.
@@ -54,6 +57,7 @@ export function createAccountDeleter({
   profiles,
   sessionGuard,
   localData,
+  sync,
 }: AccountDeleterDependencies): AccountDeleter {
   return {
     async deleteAccount(input) {
@@ -77,8 +81,11 @@ export function createAccountDeleter({
         const reauth = await auth.reauthenticate({ password: parsed.data.password });
         if (!reauth.ok) return failAt(reauth.error);
 
-        // The user's recipes and meal plans on the server.
+        // The user's recipes and meal plans on the server. Sync stops first and waits for a
+        // sync in progress, so nothing is uploaded after this. It stays stopped for this
+        // user even if a later step fails (until they sign in again or restart the app).
         step = "delete_data";
+        await sync.stop();
         const content = await remoteContent.deleteAll(user.uid);
         if (!content.ok) return failAt(content.reason);
 

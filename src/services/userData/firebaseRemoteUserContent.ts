@@ -4,7 +4,7 @@ import { firestoreError } from "@/services/firebase/firebaseErrors";
 import { firestoreCall, type FirestoreCallOptions } from "@/services/firebase/firestoreCalls";
 import type { RemoteDeleteResult } from "@/services/profiles/RemoteProfileStore";
 import { uidSchema } from "@/validation/authSchema";
-import { collection, getDocsFromServer, limit, query, writeBatch } from "firebase/firestore";
+import { collection, getDocsFromServer, limit, query, waitForPendingWrites, writeBatch } from "firebase/firestore";
 import type { RemoteUserContent } from "./RemoteUserContent";
 
 // The error codes passed on as-is. Anything else becomes "unknown".
@@ -47,6 +47,9 @@ export function createFirebaseRemoteUserContent({
       // Only the signed-in user's own content. The Security Rules check this too.
       if (auth.currentUser?.uid !== parsedUid.data) return { ok: false, reason: "not_owner" };
       try {
+        // A sync upload that timed out stays queued in the SDK and could land after the
+        // list below, leaving a document behind. Let queued writes reach the server first.
+        await firestoreCall(callOptions, () => waitForPendingWrites(db));
         for (const name of CONTENT_COLLECTIONS) {
           await deleteCollection(parsedUid.data, name);
         }

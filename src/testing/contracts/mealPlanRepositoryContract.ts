@@ -311,6 +311,19 @@ export function describeMealPlanRepositoryContract(
         expect(await repo.listPending(MAX_PENDING_BATCH)).toHaveLength(3);
       });
 
+      it("continues from a cursor", async () => {
+        const { repo } = await setup();
+        const ids: string[] = [];
+        for (let index = 0; index < 3; index += 1) {
+          ids.push(expectOk(await repo.add(ENTRY_INPUT)).id);
+        }
+        const [first] = await repo.listPending(1);
+        const rest = await repo.listPending(10, { updatedAt: first.data.updatedAt, id: first.id });
+        expect([first.id, ...rest.map((record) => record.id)]).toEqual([...ids].sort());
+        expect(await repo.listPending(10, { updatedAt: T0, id: "x" })).toHaveLength(3);
+        expect(await repo.listPending(10, { updatedAt: "x", id: "a" } as never)).toEqual([]);
+      });
+
       it.each([0, -1, 1.5, NaN, MAX_PENDING_BATCH + 1])("lists nothing for limit %p", async (limit) => {
         const { repo } = await setup();
         await repo.add(ENTRY_INPUT);
@@ -399,6 +412,17 @@ export function describeMealPlanRepositoryContract(
         }
         expect(await repo.getById(INCOMING_ID)).toBeUndefined();
         expect(await everything(repo)).toEqual([]);
+      });
+
+      it("a delete always wins: an older removed copy replaces a newer local edit", async () => {
+        const { repo, setTime } = await setupWithIncoming();
+        setTime(T0 + 50_000);
+        await repo.update(INCOMING_ID, { servings: 9 });
+
+        const removedElsewhere = { ...INCOMING_ENTRY, updatedAt: T0 + 10, deletedAt: T0 + 10 };
+        expect(await repo.mergeIncoming(INCOMING_ID, removedElsewhere)).toBe("applied");
+        expect(await repo.getById(INCOMING_ID)).toBeUndefined();
+        expect(await repo.pendingCount()).toBe(0);
       });
 
       it("applies a newer removed copy, and the entry then stays removed", async () => {

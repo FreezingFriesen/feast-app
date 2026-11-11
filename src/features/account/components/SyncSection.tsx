@@ -9,7 +9,7 @@ import { useSyncStatus } from "../useSyncStatus";
 import { AccountSection } from "./AccountSection";
 
 // Sync status (#19, N-19): last sync, pending changes, offline, errors, restore progress.
-// Display and "Sync now" only; the sync engine is separate work (a stub for now).
+// Display and "Sync now" only; the sync engine (createSyncService) does the work.
 export function SyncSection() {
   const sync = useSyncService();
   // What sync is doing now. Updates by itself as it changes.

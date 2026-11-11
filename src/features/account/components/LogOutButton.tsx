@@ -8,8 +8,8 @@ import { useAccountFlows } from "../useAccountFlows";
 import { useOnline } from "../useOnline";
 import { useSyncStatus } from "../useSyncStatus";
 
-// Log out after confirming. Warns about unsynced changes and offers to sync first.
-// Logging out itself works offline.
+// Log out after confirming. Syncs what it can, warns about changes that still aren't
+// backed up, and offers to sync first. Logging out itself works offline.
 export function LogOutButton() {
   const { logOut } = useAccountFlows();
   // How many changes are waiting to sync, and whether sync is working at all.
@@ -38,11 +38,20 @@ export function LogOutButton() {
     }
   }
 
-  // Shows the phone's own pop-up asking "Log out?". The wording and buttons come from
-  // logOutPrompt, which depends on whether there are unsynced changes. Cancel does nothing.
-  function confirmLogOut() {
+  // Syncs what it can first (never for long, and never blocking log out), then shows the
+  // phone's own pop-up asking "Log out?". The wording and buttons come from logOutPrompt,
+  // which warns about changes that still aren't backed up. Cancel does nothing.
+  async function confirmLogOut() {
+    setBusy(true);
+    setError(null);
+    let pendingChanges: number;
+    try {
+      ({ pendingChanges } = await logOut.prepare());
+    } finally {
+      setBusy(false);
+    }
     const prompt = logOutPrompt({
-      pendingChanges: status.pendingChanges,
+      pendingChanges,
       online,
       syncAvailable: status.state !== "unavailable",
       wipesLocalData: logOut.wipesLocalData,

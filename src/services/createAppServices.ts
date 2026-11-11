@@ -19,8 +19,11 @@ import { createSecureSessionStore } from "./session/SecureSessionStore";
 import type { SecureKeyValueStore } from "./session/secureKeyValue";
 import { createSessionGuard } from "./session/sessionGuard";
 import { createSessionPolicy } from "./session/SessionPolicy";
-import { createStubSyncService } from "./sync/stubSyncService";
+import { createSyncService, type SyncEngine } from "./sync/createSyncService";
+import { createSqliteSyncMetaStore } from "./sync/sqliteSyncMetaStore";
+import { createInMemoryRemoteContentStore } from "./userData/inMemoryRemoteContentStore";
 import { createInMemoryRemoteUserContent } from "./userData/inMemoryRemoteUserContent";
+import type { RemoteContentStore } from "./userData/RemoteContentStore";
 import type { RemoteUserContent } from "./userData/RemoteUserContent";
 import { createInMemoryUsernameRegistry } from "./usernames/inMemoryUsernameRegistry";
 import type { UsernameRegistry } from "./usernames/UsernameRegistry";
@@ -54,6 +57,8 @@ type AppServicesOptions = {
 export type AppServices = {
   services: Services;
   repositories: Repositories;
+  // Recipe and meal plan sync. The app calls start() once the saved login is restored.
+  syncEngine: SyncEngine;
   // Failure injection, offline switch and clock for the in-memory backend; null otherwise.
   devControls: InMemoryServerControls | null;
 };
@@ -65,6 +70,7 @@ type Remote = {
   usernames: UsernameRegistry;
   remoteProfiles: RemoteProfileStore;
   remoteContent: RemoteUserContent;
+  remoteStore: RemoteContentStore;
   devControls: InMemoryServerControls | null;
 };
 
@@ -94,6 +100,7 @@ function createRemote({ backend, authStorage, connectivity, now, latencyMs }: Re
     usernames: createInMemoryUsernameRegistry(server),
     remoteProfiles: createInMemoryRemoteProfileStore(server),
     remoteContent: createInMemoryRemoteUserContent(server),
+    remoteStore: createInMemoryRemoteContentStore(server),
     devControls: server.controls,
   };
 }
@@ -120,15 +127,26 @@ export function createAppServices({
   // first, because Firebase keeps its own session in this store's secure storage.
   const sessionStore = createSecureSessionStore(secure);
   const sessionPolicy = createSessionPolicy(now);
-  const { auth, usernames, remoteProfiles, remoteContent, devControls } = createRemote({
+  const { auth, usernames, remoteProfiles, remoteContent, remoteStore, devControls } = createRemote({
     backend,
     authStorage: sessionStore.authStorage,
     connectivity,
     now,
     latencyMs,
   });
-  // Clears every repository on this phone (log out, account deletion).
-  const localData = createLocalDataWiper([repositories.profiles, repositories.recipes, repositories.mealPlans]);
+  // What sync remembers on this phone: whose data it is and how far it has downloaded.
+  const syncMeta = createSqliteSyncMetaStore(database);
+  const sync = createSyncService({
+    auth,
+    remote: remoteStore,
+    recipes: repositories.recipes,
+    mealPlans: repositories.mealPlans,
+    meta: syncMeta,
+    connectivity,
+    now,
+  });
+  // Clears everything this phone keeps for the user (log out, account deletion).
+  const localData = createLocalDataWiper([repositories.profiles, repositories.recipes, repositories.mealPlans, syncMeta]);
 
   return {
     services: {
@@ -139,11 +157,12 @@ export function createAppServices({
       sessionStore,
       sessionPolicy,
       sessionGuard: createSessionGuard({ auth, store: sessionStore, policy: sessionPolicy, wiper: localData, now }),
-      sync: createStubSyncService(),
+      sync,
       connectivity,
       localData,
     },
     repositories,
+    syncEngine: sync,
     devControls,
   };
 }

@@ -16,17 +16,26 @@ export function formatSyncTime(timestamp: number): string {
   });
 }
 
-// What the sync section says (#19, N-19). Display only; the sync engine is separate work.
+// What the sync section says (#19, N-19). Display only; the status comes from the sync engine.
 export function syncSummary(status: SyncStatus, online: boolean | null): SyncSummary {
   if (status.restore) {
+    const { completed, total } = status.restore;
     return {
-      headline: `Restoring your data… ${status.restore.completed} of ${status.restore.total}`,
+      headline:
+        total === null ? `Restoring your data… ${completed} so far` : `Restoring your data… ${completed} of ${total}`,
       detail: "You can keep using the app while this finishes.",
       tone: "muted",
     };
   }
   if (status.state === "unavailable") {
-    return { headline: "Sync isn't set up yet", detail: "Everything is saved on this phone.", tone: "muted" };
+    return { headline: "Sync is paused", detail: "Everything is saved on this phone.", tone: "muted" };
+  }
+  if (status.state === "error" && status.problem?.kind === "other_account") {
+    return {
+      headline: "This phone has another account's data",
+      detail: "Nothing will sync until you log out, which removes it from this phone.",
+      tone: "error",
+    };
   }
   if (online === false || status.state === "offline") {
     return {
@@ -40,6 +49,14 @@ export function syncSummary(status: SyncStatus, online: boolean | null): SyncSum
   }
   if (status.state === "syncing") {
     return { headline: "Syncing…", detail: null, tone: "muted" };
+  }
+  if (status.state === "error" && status.problem?.kind === "rejected") {
+    return {
+      headline: `${changesText(status.problem.count)} couldn't be synced`,
+      detail:
+        "They're still saved on this phone and will be tried again. If this keeps happening, check that your phone's date and time are set automatically.",
+      tone: "error",
+    };
   }
   if (status.state === "error") {
     return {

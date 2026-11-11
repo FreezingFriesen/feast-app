@@ -60,6 +60,7 @@ export function createTestDevice(server: InMemoryServer, { wipeOnLogout }: { wip
       profiles,
       sessionGuard,
       localData,
+      sync: sync.service,
     }),
   };
 }

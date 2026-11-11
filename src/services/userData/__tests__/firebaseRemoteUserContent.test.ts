@@ -8,6 +8,7 @@ jest.mock("firebase/firestore", () => ({
   getDocsFromServer: jest.fn(),
   limit: jest.fn((size: number) => ({ size })),
   query: jest.fn((path: string, { size }: { size: number }) => ({ path, size })),
+  waitForPendingWrites: jest.fn(async () => {}),
   writeBatch: jest.fn(),
 }));
 
@@ -57,6 +58,14 @@ describe("deleteAll", () => {
     expect(DELETE_PAGE_SIZE).toBe(500);
     expect(sdk.collection).toHaveBeenCalledWith({}, "users", UID, "recipes");
     expect(sdk.collection).toHaveBeenCalledWith({}, "users", UID, "mealPlanEntries");
+  });
+
+  it("lets queued sync uploads reach the server before listing, so none is left behind", async () => {
+    const { content } = setup({ recipes: 3 });
+    expect(await content.deleteAll(UID)).toEqual({ ok: true });
+    expect(sdk.waitForPendingWrites.mock.invocationCallOrder[0]).toBeLessThan(
+      sdk.getDocsFromServer.mock.invocationCallOrder[0],
+    );
   });
 
   it("succeeds when there's nothing to delete", async () => {

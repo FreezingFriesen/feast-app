@@ -15,19 +15,19 @@ describe("log out confirmation", () => {
     expect(logOutPrompt({ ...base, wipesLocalData: false }).message).toBe("You can log back in at any time.");
   });
 
-  it("warns that data isn't backed up while sync doesn't exist", () => {
-    expect(logOutPrompt({ ...base, syncAvailable: false }).message).toContain("aren't backed up yet");
+  it("warns that unsynced data can't be restored while sync is paused", () => {
+    expect(logOutPrompt({ ...base, syncAvailable: false }).message).toContain("hasn't synced can't be restored");
   });
 
   it("warns about unsynced changes and offers to sync first", () => {
     const prompt = logOutPrompt({ ...base, pendingChanges: 3 });
     expect(prompt.title).toBe("You have unsynced changes");
-    expect(prompt.message).toContain("3 changes haven't synced yet");
+    expect(prompt.message).toContain("3 changes aren't backed up yet. If you log out now, they will be lost.");
     expect(choices(prompt)).toEqual([null, "log_out", "sync_then_log_out"]);
   });
 
   it("uses the singular for one change", () => {
-    expect(logOutPrompt({ ...base, pendingChanges: 1 }).message).toContain("1 change hasn't synced yet. If you log out now, it will be lost.");
+    expect(logOutPrompt({ ...base, pendingChanges: 1 }).message).toContain("1 change isn't backed up yet. If you log out now, it will be lost.");
   });
 
   it("doesn't offer to sync while offline", () => {

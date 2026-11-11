@@ -91,9 +91,18 @@ storage, the SQLite profile cache and the composition root, plus:
 - Firebase services, proven on the emulators by the same contract suite as the fake
   (`npm run test:backend`)
 
+Sync (N-19, #19) is built: `createSyncService` in `src/services/sync/` replaces the stub.
+It runs in the foreground when a user is signed in and online: at app start, after
+sign in, when the connection comes back, 3 s after local changes, and on "Sync now".
+Each run downloads recipes and meal plan entries (server reads only, paged), merges
+them (last edit wins; a delete always wins), then uploads what changed on the phone.
+A new phone restores everything with progress on the Account page. Recipes and meal
+plans are proven on the in-memory backend and the emulators (`npm test`,
+`npm run test:backend`); the real project checks are still to do. The profile
+(dietary restrictions, N-18) still syncs only at sign up and sign in.
+
 Nothing is ticked until a person confirms it on the real Firebase project (see "When
-the Firebase project is connected" in Open items). N-18 is local only until sync
-exists. Account tab phases:
+the Firebase project is connected" in Open items). Account tab phases:
 3. signed-out UI (done)
 4. signed-in UI (done)
 5. delete account (done)
@@ -149,7 +158,7 @@ exists. Account tab phases:
   transaction, not a queued write: it goes straight to the server, and the SDK retries it
   at most 5 times.
 - **Guardrails:** lint refuses the Firebase SDK outside `src/services/firebase/`, the
-  four `firebase*.ts` services, `src/testing/` and `firestore-tests/`, and `firebase-admin`
+  five `firebase*.ts` services, `src/testing/` and `firestore-tests/`, and `firebase-admin`
   outside `scripts/`. A test fails if an `EXPO_PUBLIC_` name appears beyond the seven
   in `.env.example`.
 - **Domain errors:** expected failures are typed results. Anything an implementation
@@ -157,19 +166,50 @@ exists. Account tab phases:
   `code`, not a subclass. Screens never see Firebase error codes.
 - **Local database:** `expo-sqlite` (`feast.db`). The schema lives in
   `src/storage/migrations.ts` as numbered, constant SQL migrations: 1 `profiles`,
-  2 `recipes`, 3 `meal_plan_entries` (#1). Lists are stored as JSON text, length-capped
+  2 `recipes`, 3 `meal_plan_entries` (#1), 4 `sync_meta` (N-19). Lists are stored as JSON text, length-capped
   before parsing, and every row read back is validated with the stored-record schemas
   (`storedRecipeSchema`, `storedMealPlanEntrySchema`); a row that fails reads as missing.
   The same repositories are used with both backends.
-- **Sync hooks (ready for N-19):** recipes and meal plan entries have a `dirty` column
+- **Sync hooks:** recipes and meal plan entries have a `dirty` column
   (1 = changed on this phone and not uploaded). Both repositories add `Syncable`
-  (`src/repositories/Syncable.ts`): `listPending` (dirty records, deleted ones included,
-  as `{ id, data }` where `data` is exactly the Firestore document), `pendingCount`,
+  (`src/repositories/Syncable.ts`): `listPending(limit, after?)` (dirty records, deleted
+  ones included, oldest edit first, with a cursor so refused records never block the
+  rest, as `{ id, data }` where `data` is exactly the Firestore document), `pendingCount`,
   `markSynced(id, updatedAt)` (only if `updatedAt` still matches, so an edit made during
-  an upload is uploaded next time) and `mergeIncoming` (last edit wins; a tie keeps the
-  local copy; a deleted record is never brought back, even by a newer copy that isn't
-  deleted). Edits never move `updatedAt` backwards, and SQLite edits are written only if
-  the row is still the one that was read, so a download landing mid-edit isn't lost.
+  an upload is uploaded next time) and `mergeIncoming`. Merging: **a delete always
+  wins** (a deleted copy replaces a live one however old it is, and a deleted record is
+  never brought back, matching the Rules, which never let a deleted document go live
+  again); otherwise last edit wins and a tie keeps the local copy. Edits never move
+  `updatedAt` backwards, and SQLite edits are written only if the row is still the one
+  that was read, so a download landing mid-edit isn't lost.
+- **Sync engine (N-19, #19):** `src/services/sync/createSyncService.ts` (status, triggers,
+  one run at a time) and `syncRun.ts` (one run). The server side is behind
+  `RemoteContentStore` (`src/services/userData/`): Firebase and in-memory, both held to
+  the same contract suite, which also runs on the emulators against the real Rules.
+  - Download before upload (the Rules refuse an upload over a newer server copy).
+    Downloads read from the server only, ordered by `updatedAt` then document ID, 500 a
+    page, continuing with a cursor, so hundreds of records with the same `updatedAt`
+    can't loop. Every document is validated by `mergeIncoming`; bad ones are skipped
+    and counted.
+  - The high-water mark is the newest `updatedAt` the server returned (never the phone's
+    clock), saved after each page. Each download starts **1 hour before it**
+    (`DOWNLOAD_OVERLAP_MS`), because `updatedAt` comes from phone clocks and a phone whose
+    clock is behind can upload changes that look older than ones already downloaded.
+  - Uploads are re-validated, built from the key lists in `remoteDocuments.ts` (copied
+    from `firestore.rules`: no `id`, no local fields, no `undefined`), and written 100 at
+    a time. A batch the Rules refuse is retried one record at a time, so one refused
+    record fails alone; it stays pending and is reported ("N changes couldn't be synced").
+  - `sync_meta` holds the owner uid, both high-water marks and the last sync time. Data
+    made while signed out belongs to nobody and the first user to sign in adopts it.
+    Another account's data is never merged or uploaded ("This phone has another account's
+    data"). The log out wipe clears `sync_meta` too.
+  - `stop()` cancels the run in progress, waits for it, and pauses sync until a
+    different user signs in. Log out calls it before signing out; account deletion calls
+    it right before deleting the content. Every write a run makes (local or remote) first
+    checks that the user and run are still current. `deleteAll` first waits for writes
+    the SDK still has queued.
+  - Log out runs a best-effort sync (at most 10 s) before the prompt, which then says how
+    many changes aren't backed up.
 - **Web build:** `web.output` is `single` in `app.json`, not `static`. With `static`,
   the SDK 57 dev server fails with "Worker chunk not found" because it can't bundle
   expo-sqlite's web worker. `metro.config.js` adds `.wasm` as an asset type for the
@@ -272,13 +312,28 @@ To be planned.
   log out wipes local data after confirmation; session expiry signs out but keeps
   local data; email verification is shown but doesn't block use; username change
   only in the optional last phase.
-  - Until sync exists, wiping on log out deletes recipes and meal plans for good,
-    because they aren't backed up anywhere. Now that they are kept in SQLite (#1), this
-    is the only way they are lost. Consider switching the wipe off until sync lands.
-- Local recipes and meal plans aren't tied to an account yet (no `uid` column), so a
-  second account on the same phone sees them unless the wipe ran. A later task decides
-  how local data is tied to an account.
-- Known limits of the sync hooks (for N-19):
+  - Wiping on log out deletes changes that haven't synced (refused ones, or anything
+    made offline). Log out syncs first when it can, and the prompt says how many will be
+    lost.
+- Local recipes and meal plans aren't tied to an account by a column (no `uid`); sync
+  records the owner in `sync_meta` instead. If a second account signs in without the wipe
+  (e.g. after a session expiry), it still sees the first account's data on the phone,
+  but nothing syncs until log out clears it.
+- Known limits of sync (N-19):
+  - A phone clock more than 5 minutes fast makes records the Rules refuse. They upload
+    once real time catches up (and are reported until then). A phone clock more than
+    1 hour slow can make changes other phones never download (past the overlap window).
+  - A tie (two phones editing the same record in the same millisecond) leaves each phone
+    with its own copy.
+  - Tombstones (deleted records) stay on the server and phones forever; nothing removes
+    them yet.
+  - The `memory` backend makes a new uid on every reload, so after a reload its local
+    recipes read as "another account's data" until log out.
+  - Log out can wait for one network call (at most 15 s) if a sync is in the middle of one.
+  - After an account deletion that fails part way, sync stays paused until the user signs
+    in again or restarts the app.
+  - Restore progress is shown on the Account page only; other screens fill in as records
+    arrive.
   - `mergeIncoming` for meal plans doesn't apply the 10-entries-per-slot limit (the
     server doesn't either; refusing a download would leave phones with different plans),
     so a slot can end up with more than 10. Its entries can still be edited, but nothing
@@ -337,18 +392,28 @@ To be planned.
      console (`users`, `usernames`, `recipes`, `mealPlanEntries`, the Auth user), and the
      email and username can be used again. The real project enforces "recent login"; the
      emulators don't.
-  5. **Restore on a new device:** log in on a second phone and the profile downloads.
-     Recipes and meal plans need the sync engine (N-19, #19).
+  5. **Restore on a new device:** log in on a second phone: the profile, recipes and meal
+     plans all download, with "Restoring your data… N of M" on the Account page. Edit on
+     each phone and check the other gets it after "Sync now".
   6. **Real behaviour the emulators can't show:** turn on email enumeration protection
      and a minimum-8 password policy in the console, then check that a wrong password and
      an unknown email give the same message, password reset gives the same answer, the
      reset and verification emails arrive, and too many wrong passwords shows the
-     rate-limit message. Check airplane mode on a real phone.
+     rate-limit message.
+  7. **Sync offline:** in airplane mode, add and edit recipes and meal plans: everything
+     works, and the Account page shows "Offline" with the number of changes waiting.
+     Turn airplane mode off: they upload by themselves and the count drops to 0.
+  8. **Synced documents in the console:** under `users/{uid}/recipes` and
+     `mealPlanEntries`, each document has only the allowed fields (no `id`, no `dirty`),
+     and a deleted recipe is still there with `deletedAt` (a tombstone).
+  9. **Download query:** the first sync on the real project runs without a "needs an
+     index" error (it orders by `updatedAt` and the document ID).
 
   Already passing on the emulators, no need to repeat: every rule path
-  (`npm run test:rules`), and the contract suite plus the two-accounts race, full
-  deletion with a retry after a failure at each step, and 1,200-recipe delete
-  (`npm run test:backend`).
+  (`npm run test:rules`), and the contract suites plus the two-accounts race, full
+  deletion with a retry after a failure at each step, 1,200-recipe delete, and sync:
+  restore on a second phone, edits both ways, a delete, 1,200-record restore and a
+  refused future timestamp (`npm run test:backend`).
 - Known limits of the Firebase services:
   - A phone clock more than 5 minutes fast can't claim a username. The rules refuse the
     future timestamp. The app then checks who holds the name: "name taken" only if another

@@ -19,7 +19,10 @@ export type InMemoryOperation =
   | "usernames.release"
   | "profiles.fetch"
   | "profiles.delete"
-  | "content.deleteAll";
+  | "content.deleteAll"
+  | "content.fetch"
+  | "content.write"
+  | "content.count";
 
 // Firebase-like limits the fake also enforces.
 // A sensitive change needs a login in the last 5 minutes; 5 wrong passwords lock
@@ -43,8 +46,9 @@ export type InMemoryServerState = {
   accounts: Map<string, InMemoryAccount>; // by lowercased email
   usernames: Map<string, string>; // usernames/{name} -> uid
   users: Map<string, StoredProfile>; // users/{uid}
-  // Synced content under users/{uid} (e.g. "recipes/abc"). Filled by the sync engine later.
-  userContent: Map<string, Set<string>>;
+  // Synced documents under users/{uid}, by path (e.g. "recipes/abc"). Written by the
+  // sync engine through the in-memory RemoteContentStore.
+  userContent: Map<string, Map<string, Record<string, unknown>>>;
 };
 
 export type InMemoryServerControls = {
@@ -61,7 +65,8 @@ export type InMemoryServerControls = {
 };
 
 // One simulated backend shared by the in-memory AuthService, UsernameRegistry,
-// RemoteProfileStore and RemoteUserContent, the way the Firebase services share one project.
+// RemoteProfileStore, RemoteUserContent and RemoteContentStore, the way the Firebase
+// services share one project.
 export type InMemoryServer = {
   readonly state: InMemoryServerState;
   // Set by the auth service; the registry checks it like Security Rules check request.auth.

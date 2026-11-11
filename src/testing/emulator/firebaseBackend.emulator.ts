@@ -165,6 +165,8 @@ describe("the full account deletion", () => {
       profiles,
       sessionGuard,
       localData,
+      // No sync engine in this test; sync.emulator.ts covers deletion with one.
+      sync: { stop: async () => {} },
     });
     return { ...backend, deleter, profiles, secure, email, username, uid };
   }
@@ -285,7 +287,7 @@ describe("a stored profile", () => {
       dietaryRestrictions: { allergens: ["peanuts", "sesame"], diets: ["vegan", "gluten_free"] },
       updatedAt: user.profile.updatedAt + 1,
     };
-    // The update path the sync engine will use, so the Security Rules check it too.
+    // The update path the sync engine uses, so the Security Rules check it too.
     await setDoc(doc(user.client.db, "users", user.uid), profile);
 
     expect(storedProfileSchema.parse((await rawDoc(`users/${user.uid}`)).data())).toEqual(profile);

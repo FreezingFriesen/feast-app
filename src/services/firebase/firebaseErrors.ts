@@ -53,6 +53,11 @@ export function isPermissionDenied(error: unknown): boolean {
   return firebaseCode(error) === "permission-denied";
 }
 
+// True when the SDK refused the data itself before sending it (e.g. an undefined value).
+export function isInvalidArgument(error: unknown): boolean {
+  return firebaseCode(error) === "invalid-argument";
+}
+
 // Maps a Firestore error to a DomainError. permissionDenied says what a refusal by the
 // Security Rules means for this call. DomainErrors (e.g. our own offline check) pass through.
 export function firestoreError(error: unknown, permissionDenied: DomainErrorCode): DomainError {

@@ -7,7 +7,7 @@ const expoConfig = require("eslint-config-expo/flat");
 const FIREBASE_SDK = {
   group: ["firebase", "firebase/*", "@firebase/*"],
   message:
-    "Only src/services/firebase/, the four firebase*.ts services, src/testing/ and firestore-tests/ may import the Firebase SDK.",
+    "Only src/services/firebase/, the five firebase*.ts services, src/testing/ and firestore-tests/ may import the Firebase SDK.",
 };
 
 // The admin SDK skips the Security Rules, so it must never reach the app.
@@ -35,6 +35,7 @@ module.exports = defineConfig([
       "src/services/usernames/firebaseUsernameRegistry.ts",
       "src/services/profiles/firebaseRemoteProfileStore.ts",
       "src/services/userData/firebaseRemoteUserContent.ts",
+      "src/services/userData/firebaseRemoteContentStore.ts",
       "src/testing/**",
       "firestore-tests/**",
     ],

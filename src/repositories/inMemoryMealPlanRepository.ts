@@ -8,7 +8,16 @@ import {
   type PlannerMealType,
 } from "@/validation/mealPlanSchema";
 import type { MealPlanEntry, MealPlanRepository, StoredMealPlanEntry } from "./MealPlanRepository";
-import { incomingWins, isRecordId, isTimestamp, newRecordId, nextUpdatedAt, withoutUndefined } from "./records";
+import {
+  incomingWins,
+  isRecordCursor,
+  isRecordId,
+  isTimestamp,
+  newRecordId,
+  nextUpdatedAt,
+  pendingPage,
+  withoutUndefined,
+} from "./records";
 import { isPendingLimit } from "./Syncable";
 
 // The meal plan kept in memory: it lasts only while the app is open. Used by tests and by
@@ -151,13 +160,10 @@ export function createInMemoryMealPlanRepository(
       return data ? toEntry(id, data) : undefined;
     },
 
-    async listPending(limit) {
-      if (!isPendingLimit(limit)) return [];
-      return [...entries]
-        .filter(([id]) => pending.has(id))
-        .sort(([, a], [, b]) => a.updatedAt - b.updatedAt)
-        .slice(0, limit)
-        .map(([id, data]) => ({ id, data }));
+    async listPending(limit, after) {
+      if (!isPendingLimit(limit) || (after !== undefined && !isRecordCursor(after))) return [];
+      const records = [...entries].filter(([id]) => pending.has(id)).map(([id, data]) => ({ id, data }));
+      return pendingPage(records, limit, after);
     },
 
     async pendingCount() {

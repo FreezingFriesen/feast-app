@@ -22,8 +22,8 @@ describe("migrations", () => {
     const db = createNodeSqliteDatabase();
     await runMigrations(db);
     expect(version(db)).toBe(MIGRATIONS.length);
-    expect(MIGRATIONS).toHaveLength(3);
-    expect(names(db, "table")).toEqual(["meal_plan_entries", "profiles", "recipes"]);
+    expect(MIGRATIONS).toHaveLength(4);
+    expect(names(db, "table")).toEqual(["meal_plan_entries", "profiles", "recipes", "sync_meta"]);
     expect(names(db, "index")).toEqual([
       "meal_plan_entries_dirty",
       "meal_plan_entries_slot",
@@ -39,7 +39,7 @@ describe("migrations", () => {
     expect(version(db)).toBe(1);
 
     await runMigrations(db);
-    expect(version(db)).toBe(3);
+    expect(version(db)).toBe(MIGRATIONS.length);
     expect(Object.values(db.raw.prepare("SELECT * FROM profiles").get() as object)).toEqual(PROFILE_ROW);
     expect(names(db, "table")).toContain("recipes");
   });
@@ -50,7 +50,7 @@ describe("migrations", () => {
     db.raw.prepare(INSERT_PROFILE).run(...PROFILE_ROW);
     await runMigrations(db);
     await runMigrations(db);
-    expect(version(db)).toBe(3);
+    expect(version(db)).toBe(MIGRATIONS.length);
     expect(db.raw.prepare("SELECT COUNT(*) AS count FROM profiles").get()).toEqual({ count: 1 });
   });
 
@@ -69,7 +69,7 @@ describe("migrations", () => {
     const db = createNodeSqliteDatabase();
     await runMigrations(db);
     // A table a new migration would create already exists, so that migration fails.
-    db.raw.exec("PRAGMA user_version = 1; DROP TABLE meal_plan_entries;");
+    db.raw.exec("PRAGMA user_version = 1; DROP TABLE meal_plan_entries; DROP TABLE sync_meta;");
     await expect(runMigrations(db)).rejects.toThrow();
     expect(version(db)).toBe(1);
     expect(names(db, "table")).toEqual(["profiles", "recipes"]);

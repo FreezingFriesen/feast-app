@@ -9,7 +9,15 @@ import {
   storedMealPlanEntrySchema,
 } from "@/validation/mealPlanSchema";
 import type { MealPlanEntry, MealPlanRepository, StoredMealPlanEntry } from "./MealPlanRepository";
-import { isRecordId, isTimestamp, newRecordId, nextUpdatedAt, withoutUndefined } from "./records";
+import {
+  isRecordCursor,
+  isRecordId,
+  isTimestamp,
+  newRecordId,
+  nextUpdatedAt,
+  pendingCursorParams,
+  withoutUndefined,
+} from "./records";
 import { isPendingLimit, type PendingRecord } from "./Syncable";
 
 // One row of the meal_plan_entries table, as SQLite returns it.
@@ -33,7 +41,8 @@ const SELECT_LIVE_BY_ID = `SELECT id, date, meal_type, recipe_id, servings, crea
 const SELECT_LIVE_BETWEEN = `SELECT id, date, meal_type, recipe_id, servings, created_at, updated_at, deleted_at, schema_version
   FROM meal_plan_entries WHERE deleted_at IS NULL AND date >= ? AND date <= ? ORDER BY created_at, rowid`;
 const SELECT_PENDING = `SELECT id, date, meal_type, recipe_id, servings, created_at, updated_at, deleted_at, schema_version
-  FROM meal_plan_entries WHERE dirty = 1 ORDER BY updated_at, rowid LIMIT ?`;
+  FROM meal_plan_entries WHERE dirty = 1 AND (updated_at > ? OR (updated_at = ? AND id > ?))
+  ORDER BY updated_at, id LIMIT ?`;
 const COUNT_PENDING = "SELECT COUNT(*) AS count FROM meal_plan_entries WHERE dirty = 1";
 // The slot check and the write are one statement, so two adds at the same time can't
 // both see room for one more entry. Nothing is inserted if the slot is full.
@@ -56,9 +65,9 @@ const REMOVE_IF_UNCHANGED = `UPDATE meal_plan_entries SET deleted_at = ?, update
   WHERE id = ? AND deleted_at IS NULL AND updated_at = ?`;
 // Only if nothing changed since the upload started.
 const MARK_SYNCED = "UPDATE meal_plan_entries SET dirty = 0 WHERE id = ? AND updated_at = ? AND dirty = 1";
-// Last edit wins inside SQLite (the same rule as incomingWins in records.ts): an existing
-// row is replaced only by a newer copy, and a deleted row only by a copy that is also
-// deleted. Downloaded rows have nothing to upload (dirty = 0).
+// The same rule as incomingWins in records.ts, inside SQLite: a deleted copy replaces a
+// live row however old it is, a live copy never replaces a deleted row, and otherwise the
+// newer copy wins. Downloaded rows have nothing to upload (dirty = 0).
 const UPSERT_IF_NEWER = `INSERT INTO meal_plan_entries
     (id, date, meal_type, recipe_id, servings, created_at, updated_at, deleted_at, schema_version, dirty)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
@@ -72,8 +81,9 @@ const UPSERT_IF_NEWER = `INSERT INTO meal_plan_entries
     deleted_at = excluded.deleted_at,
     schema_version = excluded.schema_version,
     dirty = 0
-  WHERE excluded.updated_at > meal_plan_entries.updated_at
-    AND (meal_plan_entries.deleted_at IS NULL OR excluded.deleted_at IS NOT NULL)`;
+  WHERE (excluded.deleted_at IS NOT NULL AND meal_plan_entries.deleted_at IS NULL)
+    OR ((excluded.deleted_at IS NULL) = (meal_plan_entries.deleted_at IS NULL)
+      AND excluded.updated_at > meal_plan_entries.updated_at)`;
 const DELETE_ALL = "DELETE FROM meal_plan_entries";
 
 // How many times an edit is tried when a download changes the row between reading and
@@ -272,9 +282,9 @@ export function createSqliteMealPlanRepository(
     },
 
     // A row that fails validation is skipped: it can't be uploaded, so it stays pending.
-    async listPending(limit) {
-      if (!isPendingLimit(limit)) return [];
-      return validRecords(await db.getAllAsync<EntryRow>(SELECT_PENDING, [limit]));
+    async listPending(limit, after) {
+      if (!isPendingLimit(limit) || (after !== undefined && !isRecordCursor(after))) return [];
+      return validRecords(await db.getAllAsync<EntryRow>(SELECT_PENDING, [...pendingCursorParams(after), limit]));
     },
 
     async pendingCount() {

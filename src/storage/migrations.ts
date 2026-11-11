@@ -60,6 +60,16 @@ export const MIGRATIONS: readonly string[] = [
   CREATE INDEX meal_plan_entries_dirty ON meal_plan_entries (dirty);
   PRAGMA user_version = 3;
   COMMIT;`,
+  // 4: sync metadata (N-19): who owns the local data, how far each collection has been
+  // downloaded, and when the last sync finished. Keys come from a fixed list in
+  // sqliteSyncMetaStore.ts; values are text, validated when read.
+  `BEGIN;
+  CREATE TABLE sync_meta (
+    key TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL
+  );
+  PRAGMA user_version = 4;
+  COMMIT;`,
 ];
 
 // Brings the database up to the latest version. Safe to run on every app start.

@@ -1,6 +1,15 @@
 import { RECIPE_SCHEMA_VERSION, recipeSchema, storedRecipeSchema } from "@/validation/recipeSchema";
 import type { Recipe, RecipeRepository, StoredRecipe } from "./RecipeRepository";
-import { incomingWins, isRecordId, isTimestamp, newRecordId, nextUpdatedAt, withoutUndefined } from "./records";
+import {
+  incomingWins,
+  isRecordCursor,
+  isRecordId,
+  isTimestamp,
+  newRecordId,
+  nextUpdatedAt,
+  pendingPage,
+  withoutUndefined,
+} from "./records";
 import { isPendingLimit } from "./Syncable";
 
 // Recipes kept in memory: they last only while the app is open. Used by tests and by
@@ -108,13 +117,10 @@ export function createInMemoryRecipeRepository(
       return data ? toRecipe(id, data) : undefined;
     },
 
-    async listPending(limit) {
-      if (!isPendingLimit(limit)) return [];
-      return [...recipes]
-        .filter(([id]) => pending.has(id))
-        .sort(([, a], [, b]) => a.updatedAt - b.updatedAt)
-        .slice(0, limit)
-        .map(([id, data]) => ({ id, data }));
+    async listPending(limit, after) {
+      if (!isPendingLimit(limit) || (after !== undefined && !isRecordCursor(after))) return [];
+      const records = [...recipes].filter(([id]) => pending.has(id)).map(([id, data]) => ({ id, data }));
+      return pendingPage(records, limit, after);
     },
 
     async pendingCount() {

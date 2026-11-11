@@ -120,9 +120,23 @@ describe("createAppServices with the in-memory backend", () => {
     expect((globalThis as { firebaseSdkLoaded?: boolean }).firebaseSdkLoaded).toBeUndefined();
   });
 
-  it("starts with the stub sync status", async () => {
-    const { services } = await setup("memory");
+  it("wires the sync engine: idle until started, then it uploads, and the wipe forgets its metadata", async () => {
+    const { services, repositories, syncEngine, database } = await setup("memory");
+    expect(services.sync).toBe(syncEngine);
     expect(services.sync.getStatus()).toMatchObject({ state: "unavailable", pendingChanges: 0 });
+
+    const stop = syncEngine.start();
+    const signUp = await services.auth.signUp({ email: "levi@example.com", password: "correct horse battery" });
+    if (!signUp.ok) throw new Error(signUp.error);
+    await repositories.recipes.create(RECIPE);
+    expect(await services.sync.syncNow()).toMatchObject({ state: "idle", pendingChanges: 0, problem: null });
+    expect(syncEngine.lastReport()).toMatchObject({ uploaded: 1 });
+
+    const metaRows = () => database.raw.prepare("SELECT COUNT(*) AS count FROM sync_meta").get();
+    expect(metaRows()).not.toEqual({ count: 0 });
+    await services.localData.wipe();
+    expect(metaRows()).toEqual({ count: 0 });
+    stop();
   });
 });
 

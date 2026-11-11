@@ -12,8 +12,8 @@ async function setup() {
   const device = createTestDevice(server);
   expect(await device.signUpFlow.signUp(signUpForm)).toEqual({ status: "signed_up" });
   const uid = device.auth.currentUser()!.uid;
-  // Synced recipes and meal plans, as the sync engine will store them.
-  server.state.userContent.set(uid, new Set(["recipes/r1", "mealPlanEntries/e1"]));
+  // Synced recipes and meal plans, as the sync engine stores them.
+  server.state.userContent.set(uid, new Map([["recipes/r1", {}], ["mealPlanEntries/e1", {}]]));
   return { server, connectivity, device, uid };
 }
 
@@ -45,6 +45,26 @@ describe("account deletion (N-17)", () => {
     const context = await setup();
     expect(await context.device.accountDeleter.deleteAccount(confirmed)).toEqual({ ok: true });
     await expectFullyDeleted(context);
+  });
+
+  it("stops sync after re-authenticating and before deleting the content, so nothing is uploaded again", async () => {
+    const context = await setup();
+    const { device, server, uid } = context;
+    const atStop: boolean[] = [];
+    device.sync.service.stop = async () => {
+      atStop.push(server.state.userContent.has(uid));
+    };
+    expect(await device.accountDeleter.deleteAccount(confirmed)).toEqual({ ok: true });
+    expect(atStop).toEqual([true]);
+
+    // A wrong password stops nothing: sync keeps running for the user.
+    const again = await setup();
+    const stops: boolean[] = [];
+    again.device.sync.service.stop = async () => {
+      stops.push(true);
+    };
+    await again.device.accountDeleter.deleteAccount({ ...confirmed, password: "wrong password" });
+    expect(stops).toEqual([]);
   });
 
   it("frees the email and the username for new accounts", async () => {

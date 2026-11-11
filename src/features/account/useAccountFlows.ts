@@ -41,6 +41,7 @@ export function useAccountFlows() {
         profiles,
         sessionGuard,
         localData,
+        sync,
       }),
     }),
     [auth, usernames, remoteProfiles, remoteContent, sessionGuard, localData, profiles, sync],

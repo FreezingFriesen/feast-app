@@ -59,6 +59,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Once started, sync recipes and meal plans in the foreground (N-19): straight away if a
+  // saved login was restored, and on sign in, reconnecting and local changes after that.
+  // Stops listening if this goes away.
+  useEffect(() => {
+    if (startup.status !== "ready") return;
+    return startup.app.syncEngine.start();
+  }, [startup]);
+
   // Nothing is drawn while starting. If startup failed, show why instead of the app.
   if (startup.status === "loading") return null;
   if (startup.status === "failed") {

@@ -305,6 +305,32 @@ export function describeRecipeRepositoryContract(
         expect(await repo.listPending(MAX_PENDING_BATCH)).toHaveLength(3);
       });
 
+      it("continues from a cursor, so records behind a failed one are still reached", async () => {
+        const { repo } = await setup();
+        const ids: string[] = [];
+        for (let index = 0; index < 3; index += 1) {
+          ids.push(expectCreated(await repo.create(RECIPE_INPUT)).id);
+        }
+        // Same updatedAt for all three, so the order falls back to the ID.
+        const sorted = [...ids].sort();
+        const pages: string[] = [];
+        let page = await repo.listPending(1);
+        while (page.length > 0) {
+          pages.push(page[0].id);
+          page = await repo.listPending(1, { updatedAt: page[0].data.updatedAt, id: page[0].id });
+        }
+        expect(pages).toEqual(sorted);
+      });
+
+      it.each([{ updatedAt: "x", id: "a" }, { updatedAt: T0, id: "../x" }, null])(
+        "lists nothing for cursor %p",
+        async (cursor) => {
+          const { repo } = await setup();
+          await repo.create(RECIPE_INPUT);
+          expect(await repo.listPending(10, cursor as never)).toEqual([]);
+        },
+      );
+
       it.each([0, -1, 1.5, NaN, Infinity, MAX_PENDING_BATCH + 1])("lists nothing for limit %p", async (limit) => {
         const { repo } = await setup();
         await repo.create(RECIPE_INPUT);
@@ -397,6 +423,18 @@ export function describeRecipeRepositoryContract(
         expect(await repo.getById(INCOMING_ID)).toBeUndefined();
         expect(await repo.list()).toEqual([]);
         expect(await repo.pendingCount()).toBe(1);
+      });
+
+      it("a delete always wins: an older deleted copy replaces a newer local edit", async () => {
+        const { repo, setTime } = await setupWithIncoming();
+        setTime(T0 + 50_000);
+        await repo.update(INCOMING_ID, { ...RECIPE_INPUT, title: "Edited after the delete" });
+
+        const deletedElsewhere = { ...INCOMING_RECIPE, updatedAt: T0 + 10, deletedAt: T0 + 10 };
+        expect(await repo.mergeIncoming(INCOMING_ID, deletedElsewhere)).toBe("applied");
+        expect(await repo.getById(INCOMING_ID)).toBeUndefined();
+        // The edit can never upload over the deleted copy, so it is no longer pending.
+        expect(await repo.pendingCount()).toBe(0);
       });
 
       it("applies a newer deleted copy, and the recipe then stays deleted", async () => {

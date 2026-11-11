@@ -1,4 +1,5 @@
 import { createTestDevice, createTestServer } from "@/testing/accountTestBed";
+import { createLogOutFlow } from "../logOutFlow";
 
 const form = {
   email: "levi@example.com",
@@ -74,5 +75,57 @@ describe("log out flow", () => {
     jest.spyOn(device.profiles, "clear").mockRejectedValue(new Error("disk full"));
     expect(await device.logOutFlow.logOut()).toEqual({ ok: false, error: "storage_failed" });
     expect(device.auth.currentUser()).toBeNull();
+  });
+
+  it("stops sync while still signed in, before anything is removed", async () => {
+    const { device, uid } = await signedInDevice();
+    let atStop: { signedIn: boolean; hasProfile: boolean } | undefined;
+    device.sync.service.stop = async () => {
+      atStop = { signedIn: device.auth.currentUser() !== null, hasProfile: (await device.profiles.get(uid)) !== undefined };
+    };
+    expect(await device.logOutFlow.logOut()).toEqual({ ok: true });
+    expect(atStop).toEqual({ signedIn: true, hasProfile: true });
+  });
+});
+
+describe("before the log out prompt", () => {
+  // The flow as useAccountFlows builds it, with a short time limit for the sync.
+  async function deviceWithFlow() {
+    const { device, uid } = await signedInDevice();
+    const flow = createLogOutFlow({
+      auth: device.auth,
+      sessionGuard: device.sessionGuard,
+      localData: device.localData,
+      sync: device.sync.service,
+      prepareTimeoutMs: 20,
+    });
+    return { device, uid, flow };
+  }
+
+  it("syncs what it can and returns how many changes still aren't backed up", async () => {
+    const { device, flow } = await deviceWithFlow();
+    device.sync.setStatus({ pendingChanges: 3 });
+    device.sync.onSync((current) => ({ ...current, pendingChanges: 1 }));
+    expect(await flow.prepare()).toEqual({ pendingChanges: 1 });
+    expect(device.sync.calls).toEqual(["syncNow"]);
+  });
+
+  it("doesn't wait longer than the time limit for a slow sync", async () => {
+    const { device, flow } = await deviceWithFlow();
+    device.sync.setStatus({ pendingChanges: 2 });
+    device.sync.onSync(() => new Promise(() => {}));
+    expect(await flow.prepare()).toEqual({ pendingChanges: 2 });
+  });
+
+  it("carries on when the sync fails, and logging out still wipes the phone", async () => {
+    const { device, uid, flow } = await deviceWithFlow();
+    device.sync.setStatus({ pendingChanges: 2 });
+    device.sync.onSync(() => {
+      throw new Error("network");
+    });
+    expect(await flow.prepare()).toEqual({ pendingChanges: 2 });
+    expect(await flow.logOut()).toEqual({ ok: true });
+    expect(device.auth.currentUser()).toBeNull();
+    expect(await device.profiles.get(uid)).toBeUndefined();
   });
 });

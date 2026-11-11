@@ -12,7 +12,15 @@ import {
   storedRecipeSchema,
 } from "@/validation/recipeSchema";
 import type { Recipe, RecipeRepository, StoredRecipe } from "./RecipeRepository";
-import { isRecordId, isTimestamp, newRecordId, nextUpdatedAt, withoutUndefined } from "./records";
+import {
+  isRecordCursor,
+  isRecordId,
+  isTimestamp,
+  newRecordId,
+  nextUpdatedAt,
+  pendingCursorParams,
+  withoutUndefined,
+} from "./records";
 import { isPendingLimit, type PendingRecord } from "./Syncable";
 
 // One row of the recipes table, as SQLite returns it. The four lists are JSON text;
@@ -45,7 +53,8 @@ const SELECT_LIVE = `SELECT id, title, description, servings, prep_time_minutes,
   FROM recipes WHERE deleted_at IS NULL ORDER BY updated_at DESC, rowid`;
 const SELECT_PENDING = `SELECT id, title, description, servings, prep_time_minutes, cook_time_minutes,
     meal_types, ingredients, steps, diet_tags, notes, created_at, updated_at, deleted_at, schema_version
-  FROM recipes WHERE dirty = 1 ORDER BY updated_at, rowid LIMIT ?`;
+  FROM recipes WHERE dirty = 1 AND (updated_at > ? OR (updated_at = ? AND id > ?))
+  ORDER BY updated_at, id LIMIT ?`;
 const COUNT_PENDING = "SELECT COUNT(*) AS count FROM recipes WHERE dirty = 1";
 const INSERT_LOCAL = `INSERT INTO recipes (title, description, servings, prep_time_minutes, cook_time_minutes,
     meal_types, ingredients, steps, diet_tags, notes, id, created_at, updated_at, deleted_at, schema_version, dirty)
@@ -59,9 +68,9 @@ const REMOVE_IF_UNCHANGED = `UPDATE recipes SET deleted_at = ?, updated_at = ?, 
   WHERE id = ? AND deleted_at IS NULL AND updated_at = ?`;
 // Only if nothing changed since the upload started.
 const MARK_SYNCED = "UPDATE recipes SET dirty = 0 WHERE id = ? AND updated_at = ? AND dirty = 1";
-// Last edit wins inside SQLite (the same rule as incomingWins in records.ts): an existing
-// row is replaced only by a newer copy, and a deleted row only by a copy that is also
-// deleted. Downloaded rows have nothing to upload (dirty = 0).
+// The same rule as incomingWins in records.ts, inside SQLite: a deleted copy replaces a
+// live row however old it is, a live copy never replaces a deleted row, and otherwise the
+// newer copy wins. Downloaded rows have nothing to upload (dirty = 0).
 const UPSERT_IF_NEWER = `INSERT INTO recipes (title, description, servings, prep_time_minutes, cook_time_minutes,
     meal_types, ingredients, steps, diet_tags, notes, id, created_at, updated_at, deleted_at, schema_version, dirty)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
@@ -81,8 +90,8 @@ const UPSERT_IF_NEWER = `INSERT INTO recipes (title, description, servings, prep
     deleted_at = excluded.deleted_at,
     schema_version = excluded.schema_version,
     dirty = 0
-  WHERE excluded.updated_at > recipes.updated_at
-    AND (recipes.deleted_at IS NULL OR excluded.deleted_at IS NOT NULL)`;
+  WHERE (excluded.deleted_at IS NOT NULL AND recipes.deleted_at IS NULL)
+    OR ((excluded.deleted_at IS NULL) = (recipes.deleted_at IS NULL) AND excluded.updated_at > recipes.updated_at)`;
 const DELETE_ALL = "DELETE FROM recipes";
 
 // The longest JSON text each list column can need, worked out from the recipe limits.
@@ -283,9 +292,9 @@ export function createSqliteRecipeRepository(
     },
 
     // A row that fails validation is skipped: it can't be uploaded, so it stays pending.
-    async listPending(limit) {
-      if (!isPendingLimit(limit)) return [];
-      return validRecords(await db.getAllAsync<RecipeRow>(SELECT_PENDING, [limit]));
+    async listPending(limit, after) {
+      if (!isPendingLimit(limit) || (after !== undefined && !isRecordCursor(after))) return [];
+      return validRecords(await db.getAllAsync<RecipeRow>(SELECT_PENDING, [...pendingCursorParams(after), limit]));
     },
 
     async pendingCount() {
