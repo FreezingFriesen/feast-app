@@ -7,26 +7,37 @@ jest.mock("firebase/firestore", () => ({
   deleteDoc: jest.fn(),
   doc: jest.fn((_db: unknown, ...path: string[]) => path.join("/")),
   getDocFromServer: jest.fn(),
-  writeBatch: jest.fn(),
+  runTransaction: jest.fn(),
 }));
 
 const sdk = jest.requireMock<Record<string, jest.Mock>>("firebase/firestore");
 
 const UID = "Xy3kP9qLmN2vB7cD1eF4gH6jK8l0";
+const OTHER_UID = "SomeoneElse123";
 const NOW = Date.UTC(2026, 10, 7, 12, 0);
 const firestoreError = (code: string) => Object.assign(new Error(`${code} for levi_f`), { code });
+const missing = { exists: () => false, get: () => undefined };
+const ownedBy = (uid: string) => ({ exists: () => true, get: (field: string) => (field === "uid" ? uid : undefined) });
 
-function setup({ online = true, signedInUid = UID }: { online?: boolean; signedInUid?: string | null } = {}) {
+// runTransaction against a pretend server holding the `existing` paths. The writes the
+// transaction makes are recorded.
+function setup({ online = true, signedInUid = UID as string | null, existing = [] as string[] } = {}) {
   jest.clearAllMocks();
-  const batch = { set: jest.fn(), commit: jest.fn(async () => {}) };
-  sdk.writeBatch.mockReturnValue(batch);
+  const writes: [string, unknown][] = [];
+  const transaction = {
+    get: jest.fn(async (path: string) => ({ exists: () => existing.includes(path) })),
+    set: jest.fn((path: string, data: unknown) => writes.push([path, data])),
+  };
+  sdk.runTransaction.mockImplementation((_db, update: (t: typeof transaction) => Promise<unknown>) =>
+    update(transaction),
+  );
   const registry = createFirebaseUsernameRegistry({
     client: { auth: { currentUser: signedInUid ? { uid: signedInUid } : null }, db: {} } as never,
     connectivity: createFakeConnectivity(online).service,
     now: () => NOW,
     timeoutMs: 20,
   });
-  return { registry, batch };
+  return { registry, transaction, writes };
 }
 
 describe("isAvailable", () => {
@@ -74,17 +85,29 @@ describe("claim", () => {
     schemaVersion: 1,
   };
 
-  it("writes both documents in one batch, with exact fields and whole-number timestamps", async () => {
-    const { registry, batch } = setup();
+  it("reads both documents, then writes both in one transaction, with exact fields", async () => {
+    const { registry, transaction, writes } = setup();
     expect(await registry.claim(UID, "Levi_F")).toEqual({ ok: true, profile: expectedProfile });
 
-    expect(sdk.writeBatch).toHaveBeenCalledTimes(1);
-    expect(batch.commit).toHaveBeenCalledTimes(1);
-    expect(batch.set.mock.calls).toEqual([
+    expect(sdk.runTransaction).toHaveBeenCalledTimes(1);
+    expect(transaction.get.mock.calls).toEqual([["usernames/levi_f"], [`users/${UID}`]]);
+    expect(writes).toEqual([
       ["usernames/levi_f", { uid: UID }],
       [`users/${UID}`, expectedProfile],
     ]);
-    expect(Number.isInteger(batch.set.mock.calls[1][1].createdAt)).toBe(true);
+    expect(Number.isInteger((writes[1][1] as { createdAt: unknown }).createdAt)).toBe(true);
+  });
+
+  it("reports a name someone already holds as taken, and writes nothing", async () => {
+    const { registry, writes } = setup({ existing: ["usernames/levi_f"] });
+    expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason: "taken" });
+    expect(writes).toEqual([]);
+  });
+
+  it("refuses a second username for a user who already has one, and writes nothing", async () => {
+    const { registry, writes } = setup({ existing: [`users/${UID}`] });
+    expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason: "taken" });
+    expect(writes).toEqual([]);
   });
 
   it.each([
@@ -97,34 +120,68 @@ describe("claim", () => {
     const { registry } = setup();
     expect(await registry.claim(uid, name)).toEqual({ ok: false, reason: "invalid_input" });
     expect(sdk.doc).not.toHaveBeenCalled();
+    expect(sdk.runTransaction).not.toHaveBeenCalled();
   });
 
-  it.each([["SomeoneElse123"], [null]])("refuses when %p is signed in instead", async (signedInUid) => {
+  it.each([[OTHER_UID], [null]])("refuses when %p is signed in instead", async (signedInUid) => {
     const { registry } = setup({ signedInUid });
     expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason: "not_owner" });
-    expect(sdk.writeBatch).not.toHaveBeenCalled();
+    expect(sdk.runTransaction).not.toHaveBeenCalled();
+  });
+
+  describe("when the Security Rules refuse the commit", () => {
+    it("reports taken if another user got the name first (a race)", async () => {
+      const { registry } = setup();
+      sdk.runTransaction.mockRejectedValueOnce(firestoreError("permission-denied"));
+      sdk.getDocFromServer.mockResolvedValueOnce(ownedBy(OTHER_UID));
+      expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason: "taken" });
+      expect(sdk.getDocFromServer).toHaveBeenCalledWith("usernames/levi_f");
+    });
+
+    it.each([
+      ["the name is still free (e.g. a phone clock too far ahead)", missing],
+      ["the name is this user's", ownedBy(UID)],
+    ])("reports unknown, not taken, if %s", async (_case, snapshot) => {
+      const { registry } = setup();
+      sdk.runTransaction.mockRejectedValueOnce(firestoreError("permission-denied"));
+      sdk.getDocFromServer.mockResolvedValueOnce(snapshot);
+      expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason: "unknown" });
+    });
+
+    it.each([
+      ["unavailable", "offline"],
+      ["permission-denied", "unknown"],
+      ["internal", "unknown"],
+    ])("maps a failed re-read: %s -> %s", async (code, reason) => {
+      const { registry } = setup();
+      sdk.runTransaction.mockRejectedValueOnce(firestoreError("permission-denied"));
+      sdk.getDocFromServer.mockRejectedValueOnce(firestoreError(code));
+      expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason });
+    });
   });
 
   it.each([
-    ["permission-denied", "taken"],
     ["unavailable", "offline"],
+    ["deadline-exceeded", "offline"],
+    ["aborted", "unknown"],
     ["internal", "unknown"],
-  ])("%s -> %s", async (code, reason) => {
-    const { registry, batch } = setup();
-    batch.commit.mockRejectedValueOnce(firestoreError(code));
+  ])("%s -> %s, without a re-read", async (code, reason) => {
+    const { registry } = setup();
+    sdk.runTransaction.mockRejectedValueOnce(firestoreError(code));
     expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason });
+    expect(sdk.getDocFromServer).not.toHaveBeenCalled();
   });
 
-  it("doesn't hang on a write Firestore has queued", async () => {
-    const { registry, batch } = setup();
-    batch.commit.mockImplementationOnce(() => new Promise<void>(() => {}));
+  it("doesn't hang on a transaction that never finishes", async () => {
+    const { registry } = setup();
+    sdk.runTransaction.mockImplementationOnce(() => new Promise<never>(() => {}));
     expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason: "offline" });
   });
 
-  it("doesn't start a write while offline", async () => {
-    const { registry, batch } = setup({ online: false });
+  it("doesn't start a transaction while offline", async () => {
+    const { registry } = setup({ online: false });
     expect(await registry.claim(UID, "levi_f")).toEqual({ ok: false, reason: "offline" });
-    expect(batch.commit).not.toHaveBeenCalled();
+    expect(sdk.runTransaction).not.toHaveBeenCalled();
   });
 });
 
@@ -143,7 +200,7 @@ describe("release", () => {
   });
 
   it("won't free the signed-in user's name while passing someone else's uid", async () => {
-    const { registry } = setup({ signedInUid: "SomeoneElse123" });
+    const { registry } = setup({ signedInUid: OTHER_UID });
     expect(await registry.release(UID, "levi_f")).toEqual({ ok: false, reason: "not_owner" });
     expect(sdk.deleteDoc).not.toHaveBeenCalled();
   });

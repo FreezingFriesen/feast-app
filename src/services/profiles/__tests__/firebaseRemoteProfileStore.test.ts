@@ -17,10 +17,10 @@ const STORED = { username: "levi_f", dietaryRestrictions: null, createdAt: T0, u
 const firestoreError = (code: string) => Object.assign(new Error(code), { code });
 const found = (data: unknown) => ({ exists: () => true, data: () => data });
 
-function setup(online = true) {
+function setup(online = true, signedInUid: string | null = UID) {
   jest.clearAllMocks();
   return createFirebaseRemoteProfileStore({
-    client: { db: {} } as never,
+    client: { auth: { currentUser: signedInUid ? { uid: signedInUid } : null }, db: {} } as never,
     connectivity: createFakeConnectivity(online).service,
     timeoutMs: 20,
   });
@@ -74,6 +74,13 @@ describe("fetch", () => {
     expect(await store.fetch(UID)).toEqual({ ok: false, reason: "offline" });
     expect(sdk.getDocFromServer).not.toHaveBeenCalled();
   });
+
+  it.each([["SomeoneElse123"], [null]])("refuses another user's uid (%p signed in) without reading", async (who) => {
+    const store = setup(true, who);
+    expect(await store.fetch(UID)).toEqual({ ok: false, reason: "not_owner" });
+    expect(sdk.doc).not.toHaveBeenCalled();
+    expect(sdk.getDocFromServer).not.toHaveBeenCalled();
+  });
 });
 
 describe("delete", () => {
@@ -103,6 +110,12 @@ describe("delete", () => {
   it("refuses an unsafe uid", async () => {
     const store = setup();
     expect(await store.delete("../x")).toEqual({ ok: false, reason: "invalid_input" });
+    expect(sdk.deleteDoc).not.toHaveBeenCalled();
+  });
+
+  it.each([["SomeoneElse123"], [null]])("refuses another user's uid (%p signed in) without deleting", async (who) => {
+    const store = setup(true, who);
+    expect(await store.delete(UID)).toEqual({ ok: false, reason: "not_owner" });
     expect(sdk.deleteDoc).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { DOMAIN_ERROR_CODES, domainError, isDomainError } from "@/services/domainErrors";
-import { authErrorCode, firestoreError, isUserNotFound } from "../firebaseErrors";
+import { authErrorCode, firestoreError, isPermissionDenied, isUserNotFound } from "../firebaseErrors";
 
 describe("authErrorCode", () => {
   it.each([
@@ -8,6 +8,7 @@ describe("authErrorCode", () => {
     ["auth/invalid-credential", "invalid_credentials"],
     ["auth/wrong-password", "invalid_credentials"],
     ["auth/user-not-found", "invalid_credentials"],
+    ["auth/invalid-email", "invalid_credentials"],
     ["auth/requires-recent-login", "requires_recent_login"],
     // Only sign up gives these a meaning.
     ["auth/email-already-in-use", "unknown"],
@@ -25,11 +26,22 @@ describe("authErrorCode", () => {
   it.each([
     ["auth/email-already-in-use", "sign_up_failed"],
     ["auth/weak-password", "sign_up_failed"],
+    ["auth/invalid-email", "sign_up_failed"],
     ["auth/network-request-failed", "offline"],
     ["auth/too-many-requests", "rate_limited"],
     ["auth/operation-not-allowed", "unknown"],
   ])("during sign up, %s -> %s", (code, expected) => {
     expect(authErrorCode({ code }, "sign_up")).toBe(expected);
+  });
+
+  it.each([
+    ["auth/invalid-email", "invalid_input"],
+    ["auth/user-not-found", "invalid_credentials"],
+    ["auth/network-request-failed", "offline"],
+    ["auth/too-many-requests", "rate_limited"],
+    ["auth/email-already-in-use", "unknown"],
+  ])("during password reset, %s -> %s", (code, expected) => {
+    expect(authErrorCode({ code }, "password_reset")).toBe(expected);
   });
 
   it.each([new Error("network"), { code: 42 }, {}, "auth/wrong-password", null, undefined])(
@@ -45,6 +57,16 @@ describe("isUserNotFound", () => {
     expect(isUserNotFound({ code: "auth/user-not-found" })).toBe(true);
     expect(isUserNotFound({ code: "auth/wrong-password" })).toBe(false);
     expect(isUserNotFound(null)).toBe(false);
+  });
+});
+
+describe("isPermissionDenied", () => {
+  it("is true only for that code", () => {
+    expect(isPermissionDenied({ code: "permission-denied" })).toBe(true);
+    expect(isPermissionDenied({ code: "unavailable" })).toBe(false);
+    expect(isPermissionDenied(domainError("not_owner"))).toBe(false);
+    expect(isPermissionDenied("permission-denied")).toBe(false);
+    expect(isPermissionDenied(undefined)).toBe(false);
   });
 });
 

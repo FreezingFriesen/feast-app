@@ -7,7 +7,8 @@
 // is needed because the phone can say it's online when it isn't (captive portals, iOS).
 //
 // A write that timed out stays queued and can still land later. Every write is safe to
-// repeat, and a late username claim is picked up by the next profile refresh.
+// repeat. A username claim is a transaction instead: not queued, but the SDK may still be
+// retrying it for a few seconds, and a late claim is picked up by the next profile refresh.
 import type { ConnectivityService } from "@/services/connectivity/ConnectivityService";
 import { domainError } from "@/services/domainErrors";
 

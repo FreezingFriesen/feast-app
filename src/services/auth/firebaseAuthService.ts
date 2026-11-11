@@ -129,7 +129,7 @@ export function createFirebaseAuthService({ client }: { client: Pick<FirebaseCli
         return { ok: true };
       } catch (error) {
         // The same response whether or not the account exists (N-16).
-        return isUserNotFound(error) ? { ok: true } : fail(authErrorCode(error));
+        return isUserNotFound(error) ? { ok: true } : fail(authErrorCode(error, "password_reset"));
       }
     },
 

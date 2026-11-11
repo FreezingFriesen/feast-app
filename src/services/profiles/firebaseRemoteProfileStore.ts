@@ -11,21 +11,23 @@ import type { RemoteDeleteResult, RemoteProfileResult, RemoteProfileStore } from
 const REMOTE_ERRORS = ["offline", "not_owner"] as const;
 
 type FirebaseRemoteProfileStoreDependencies = FirestoreCallOptions & {
-  client: Pick<FirebaseClient, "db">;
+  client: Pick<FirebaseClient, "auth" | "db">;
 };
 
 // users/{uid} in Firestore. The Security Rules allow only the owner, and allow the
-// delete only once the username has been released.
+// delete only once the username has been released. The services check the owner too,
+// so another user's uid never reaches Firestore.
 export function createFirebaseRemoteProfileStore({
   client,
   ...callOptions
 }: FirebaseRemoteProfileStoreDependencies): RemoteProfileStore {
-  const { db } = client;
+  const { auth, db } = client;
 
   return {
     async fetch(uid): Promise<RemoteProfileResult> {
       const parsedUid = uidSchema.safeParse(uid);
       if (!parsedUid.success) return { ok: false, reason: "invalid_input" };
+      if (auth.currentUser?.uid !== parsedUid.data) return { ok: false, reason: "not_owner" };
       try {
         const snapshot = await firestoreCall(callOptions, () => getDocFromServer(doc(db, "users", parsedUid.data)));
         if (!snapshot.exists()) return { ok: true, profile: null };
@@ -40,6 +42,7 @@ export function createFirebaseRemoteProfileStore({
     async delete(uid): Promise<RemoteDeleteResult> {
       const parsedUid = uidSchema.safeParse(uid);
       if (!parsedUid.success) return { ok: false, reason: "invalid_input" };
+      if (auth.currentUser?.uid !== parsedUid.data) return { ok: false, reason: "not_owner" };
       try {
         // Deleting a profile that's already gone succeeds, so account deletion can be retried.
         await firestoreCall(callOptions, () => deleteDoc(doc(db, "users", parsedUid.data)));

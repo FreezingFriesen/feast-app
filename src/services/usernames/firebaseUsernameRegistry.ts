@@ -1,11 +1,11 @@
 import type { StoredProfile } from "@/repositories/ProfileRepository";
 import { errorCodeIn } from "@/services/domainErrors";
 import type { FirebaseClient } from "@/services/firebase/client";
-import { firestoreError } from "@/services/firebase/firebaseErrors";
+import { firestoreError, isPermissionDenied } from "@/services/firebase/firebaseErrors";
 import { firestoreCall, type FirestoreCallOptions } from "@/services/firebase/firestoreCalls";
 import { uidSchema, usernameSchema } from "@/validation/authSchema";
 import { PROFILE_SCHEMA_VERSION, storedProfileSchema } from "@/validation/profileSchema";
-import { deleteDoc, doc, getDocFromServer, writeBatch } from "firebase/firestore";
+import { deleteDoc, doc, getDocFromServer, runTransaction } from "firebase/firestore";
 import type {
   UsernameAvailability,
   UsernameClaimResult,
@@ -53,6 +53,8 @@ export function createFirebaseUsernameRegistry({
       if (!parsedUid.success || !parsedName.success) return { ok: false, reason: "invalid_input" };
       if (auth.currentUser?.uid !== parsedUid.data) return { ok: false, reason: "not_owner" };
       const name = parsedName.data;
+      const nameRef = doc(db, "usernames", name);
+      const userRef = doc(db, "users", parsedUid.data);
 
       try {
         // The new user's profile: the username, and no dietary restrictions set yet.
@@ -64,15 +66,34 @@ export function createFirebaseUsernameRegistry({
           updatedAt: timestamp,
           schemaVersion: PROFILE_SCHEMA_VERSION,
         });
-        // Both documents in one atomic write. The Security Rules refuse either one alone.
-        const batch = writeBatch(db);
-        batch.set(doc(db, "usernames", name), { uid: parsedUid.data });
-        batch.set(doc(db, "users", parsedUid.data), profile);
-        await firestoreCall(callOptions, () => batch.commit());
-        return { ok: true, profile };
+        // A transaction, not a batch: it goes straight to the server instead of the SDK's
+        // write queue, so a claim that timed out can't land whenever the phone next
+        // reconnects. Both documents are written together, because the Security Rules
+        // refuse either one alone.
+        const claimed = await firestoreCall(callOptions, () =>
+          runTransaction(db, async (transaction) => {
+            const [nameDoc, userDoc] = await Promise.all([transaction.get(nameRef), transaction.get(userRef)]);
+            // One username per user, and each name has one owner.
+            if (nameDoc.exists() || userDoc.exists()) return false;
+            transaction.set(nameRef, { uid: parsedUid.data });
+            transaction.set(userRef, profile);
+            return true;
+          }),
+        );
+        return claimed ? { ok: true, profile } : { ok: false, reason: "taken" };
       } catch (error) {
-        // A refusal means the name is taken, or this user already has a profile.
-        return { ok: false, reason: errorCodeIn(firestoreError(error, "taken"), CLAIM_ERRORS) };
+        if (!isPermissionDenied(error)) {
+          return { ok: false, reason: errorCodeIn(firestoreError(error, "unknown"), CLAIM_ERRORS) };
+        }
+        // Refused: usually another user claimed the name between our read and our write.
+        // Anything else (e.g. a phone clock more than 5 minutes fast) isn't "taken".
+        try {
+          const snapshot = await firestoreCall(callOptions, () => getDocFromServer(nameRef));
+          const owner = snapshot.exists() ? snapshot.get("uid") : undefined;
+          return { ok: false, reason: owner !== undefined && owner !== parsedUid.data ? "taken" : "unknown" };
+        } catch (rereadError) {
+          return { ok: false, reason: errorCodeIn(firestoreError(rereadError, "unknown"), CLAIM_ERRORS) };
+        }
       }
     },
 

@@ -17,7 +17,7 @@ const UID = "Xy3kP9qLmN2vB7cD1eF4gH6jK8l0";
 const firestoreError = (code: string) => Object.assign(new Error(code), { code });
 
 // A pretend server holding this many documents in each collection.
-function setup({ recipes = 0, mealPlanEntries = 0, online = true } = {}) {
+function setup({ recipes = 0, mealPlanEntries = 0, online = true, signedInUid = UID as string | null } = {}) {
   jest.clearAllMocks();
   const left: Record<string, number> = { recipes, mealPlanEntries };
   const batchSizes: number[] = [];
@@ -41,7 +41,7 @@ function setup({ recipes = 0, mealPlanEntries = 0, online = true } = {}) {
   });
 
   const content = createFirebaseRemoteUserContent({
-    client: { db: {} } as never,
+    client: { auth: { currentUser: signedInUid ? { uid: signedInUid } : null }, db: {} } as never,
     connectivity: createFakeConnectivity(online).service,
     timeoutMs: 20,
   });
@@ -68,6 +68,13 @@ describe("deleteAll", () => {
   it.each(["", "../x", "a/b", "'; DROP TABLE recipes;--"])("refuses uid %p before building a path", async (uid) => {
     const { content } = setup();
     expect(await content.deleteAll(uid)).toEqual({ ok: false, reason: "invalid_input" });
+    expect(sdk.collection).not.toHaveBeenCalled();
+  });
+
+  it.each([["SomeoneElse123"], [null]])("refuses another user's uid when %p is signed in", async (signedInUid) => {
+    const { content, left } = setup({ recipes: 3, signedInUid });
+    expect(await content.deleteAll(UID)).toEqual({ ok: false, reason: "not_owner" });
+    expect(left.recipes).toBe(3);
     expect(sdk.collection).not.toHaveBeenCalled();
   });
 

@@ -243,6 +243,12 @@ describe("password reset", () => {
     sdk.sendPasswordResetEmail.mockRejectedValueOnce(authError("auth/too-many-requests"));
     expect(await service.sendPasswordReset({ email: USER.email })).toEqual({ ok: false, error: "rate_limited" });
   });
+
+  it("reports an email Firebase finds badly formed as invalid input", async () => {
+    const { service } = setup();
+    sdk.sendPasswordResetEmail.mockRejectedValueOnce(authError("auth/invalid-email"));
+    expect(await service.sendPasswordReset({ email: USER.email })).toEqual({ ok: false, error: "invalid_input" });
+  });
 });
 
 describe("nobody signed in", () => {

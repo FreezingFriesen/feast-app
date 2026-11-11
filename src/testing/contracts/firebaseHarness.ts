@@ -29,9 +29,16 @@ function emulatorHost(variable: string, fallbackPort: number): { host: string; p
   return { host, port: Number(port) };
 }
 
+// A port nothing listens on.
+const UNREACHABLE = { host: "127.0.0.1", port: 9 };
+
 type BackendOptions = {
   connectivity?: ConnectivityService;
   timeoutMs?: number;
+  // false points Firestore at UNREACHABLE: the phone says it's online, but no request gets
+  // through. disableNetwork can't show this for a transaction, which goes straight to the
+  // server.
+  firestoreReachable?: boolean;
 };
 
 export function createFirebaseHarness() {
@@ -39,7 +46,7 @@ export function createFirebaseHarness() {
   let counter = 0;
 
   // Every backend is its own named app, so two users can be signed in at the same time.
-  function createClient(): FirebaseClient {
+  function createClient(firestoreReachable: boolean): FirebaseClient {
     counter += 1;
     const app = initializeApp({ projectId: EMULATOR_PROJECT_ID, apiKey: "demo-api-key" }, `emulator-test-${counter}`);
     apps.push(app);
@@ -48,7 +55,7 @@ export function createFirebaseHarness() {
     const auth = getAuth(app);
     connectAuthEmulator(auth, `http://${authEmulator.host}:${authEmulator.port}`, { disableWarnings: true });
 
-    const firestoreEmulator = emulatorHost("FIRESTORE_EMULATOR_HOST", 8080);
+    const firestoreEmulator = firestoreReachable ? emulatorHost("FIRESTORE_EMULATOR_HOST", 8080) : UNREACHABLE;
     const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
     connectFirestoreEmulator(db, firestoreEmulator.host, firestoreEmulator.port);
 
@@ -56,8 +63,12 @@ export function createFirebaseHarness() {
   }
 
   // One "phone": a client plus the four services, built the way the app builds them.
-  function createBackend({ connectivity = createFakeConnectivity(true).service, timeoutMs }: BackendOptions = {}) {
-    const client = createClient();
+  function createBackend({
+    connectivity = createFakeConnectivity(true).service,
+    timeoutMs,
+    firestoreReachable = true,
+  }: BackendOptions = {}) {
+    const client = createClient(firestoreReachable);
     const callOptions = { connectivity, timeoutMs };
     return {
       client,

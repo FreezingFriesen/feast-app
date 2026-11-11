@@ -320,10 +320,13 @@ describe("with no connection (the SDK queues writes and answers lists from its c
     expect(await user.remoteProfiles.delete(user.uid)).toEqual(offline);
   });
 
-  it("claiming a name reports offline instead of hanging", async () => {
-    const user = await signedUpUser(TIMEOUT);
-    await disableNetwork(user.client.db);
-    expect(await user.usernames.claim(user.uid, harness.uniqueUsername())).toEqual({ ok: false, reason: "offline" });
+  it("claiming a name reports offline instead of hanging, and claims nothing", async () => {
+    // A transaction goes straight to the server, past disableNetwork, so this phone's
+    // Firestore points where nothing answers instead.
+    const user = await signedUpUser({ ...TIMEOUT, firestoreReachable: false });
+    const name = harness.uniqueUsername();
+    expect(await user.usernames.claim(user.uid, name)).toEqual({ ok: false, reason: "offline" });
+    expect((await rawDoc(`usernames/${name}`)).exists()).toBe(false);
   });
 
   it("deleteAll doesn't report success when nothing was deleted", async () => {

@@ -141,7 +141,9 @@ exists. Account tab phases:
   pending forever, and list reads answer "empty" from its cache. So the services read
   from the server only, and every call checks the connection first and gives up after
   15 seconds, reporting `offline` (`src/services/firebase/firestoreCalls.ts`). Firestore's
-  own offline storage stays off: SQLite is our local store.
+  own offline storage stays off: SQLite is our local store. Claiming a username is a
+  transaction, not a queued write: it goes straight to the server, and the SDK retries it
+  at most 5 times.
 - **Guardrails:** lint refuses the Firebase SDK outside `src/services/firebase/`, the
   four `firebase*.ts` services, `src/testing/` and `firestore-tests/`, and `firebase-admin`
   outside `scripts/`. A test fails if an `EXPO_PUBLIC_` name appears beyond the seven
@@ -152,6 +154,11 @@ exists. Account tab phases:
 - **Local database:** `expo-sqlite` (`feast.db`). The schema lives in
   `src/storage/migrations.ts` as numbered, constant SQL migrations. Version 1 is
   `profiles`; recipes and meal plans (#1) add version 2 onwards.
+- **Web build:** `web.output` is `single` in `app.json`, not `static`. With `static`,
+  the SDK 57 dev server fails with "Worker chunk not found" because it can't bundle
+  expo-sqlite's web worker. `metro.config.js` adds `.wasm` as an asset type for the
+  same worker. Try `static` again after an Expo upgrade if static web pages are ever
+  needed.
 - **Login by email**; username is a unique display name stored in a `usernames`
   collection.
 - **Nutrition/price data:** API key stays server-side. A script or Cloud Function
@@ -315,9 +322,13 @@ To be planned.
   (`npm run test:backend`).
 - Known limits of the Firebase services:
   - A phone clock more than 5 minutes fast can't claim a username. The rules refuse the
-    future timestamp, and any refusal of the claim is reported as "name taken".
-  - A claim that timed out stays queued in the SDK and can still land later. The user
-    may get the name after all, and the next profile refresh picks that up.
+    future timestamp. The app then checks who holds the name: "name taken" only if another
+    user does, otherwise a general error.
+  - A claim that timed out isn't queued, but the SDK may still be retrying it for a few
+    seconds, so it can still land. The user may get the name after all, and the next
+    profile refresh picks that up. If the connection drops after the claim reached the
+    server, the retry sees the user's own claim and reports "name taken"; the profile
+    refresh corrects that too.
   - Email-verified status only updates on the next sign-in. `AuthService` has no reload.
   - The planned 30-day `auth_time` check isn't in the rules, so sessions are limited on
     the phone only.

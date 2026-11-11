@@ -17,7 +17,7 @@ export const DELETE_PAGE_SIZE = 500;
 const CONTENT_COLLECTIONS = ["recipes", "mealPlanEntries"] as const;
 
 type FirebaseRemoteUserContentDependencies = FirestoreCallOptions & {
-  client: Pick<FirebaseClient, "db">;
+  client: Pick<FirebaseClient, "auth" | "db">;
 };
 
 // The user's recipes and meal plan entries in Firestore.
@@ -25,7 +25,7 @@ export function createFirebaseRemoteUserContent({
   client,
   ...callOptions
 }: FirebaseRemoteUserContentDependencies): RemoteUserContent {
-  const { db } = client;
+  const { auth, db } = client;
 
   // Deletes one collection a page at a time, until the server says it's empty. The page
   // must come from the server: offline, the cache answers "empty" and nothing is deleted.
@@ -44,6 +44,8 @@ export function createFirebaseRemoteUserContent({
     async deleteAll(uid): Promise<RemoteDeleteResult> {
       const parsedUid = uidSchema.safeParse(uid);
       if (!parsedUid.success) return { ok: false, reason: "invalid_input" };
+      // Only the signed-in user's own content. The Security Rules check this too.
+      if (auth.currentUser?.uid !== parsedUid.data) return { ok: false, reason: "not_owner" };
       try {
         for (const name of CONTENT_COLLECTIONS) {
           await deleteCollection(parsedUid.data, name);
