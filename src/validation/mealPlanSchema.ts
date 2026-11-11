@@ -2,6 +2,10 @@
 import { z } from "zod";
 import { DATE_KEY_PATTERN, ID_PATTERN } from "./patterns";
 import type { MEAL_TYPES } from "./recipeSchema";
+import { DATES_IN_ORDER_ISSUE, datesInOrder, storedRecordFields } from "./storedRecord";
+
+// The version of the stored entry format. Raise it if the fields change.
+export const MEAL_PLAN_ENTRY_SCHEMA_VERSION = 1;
 
 // The planner has Breakfast, Lunch and Dinner slots (#17). "snack" stays a recipe tag only.
 export const PLANNER_MEAL_TYPES = ["breakfast", "lunch", "dinner"] as const satisfies readonly (typeof MEAL_TYPES)[number][];
@@ -45,6 +49,13 @@ export const mealPlanEntrySchema = z.object({
   recipeId: z.string().max(100).regex(ID_PATTERN),
   servings: z.number().int().min(MIN_SERVINGS).max(MAX_SERVINGS),
 });
+
+// A saved entry as it is stored on the phone and synced: the entry fields plus the fields
+// the repository sets. Data read back from SQLite or downloaded is checked with this.
+// It accepts the same fields as validMealPlanEntry in firestore.rules.
+export const storedMealPlanEntrySchema = mealPlanEntrySchema
+  .extend(storedRecordFields(MEAL_PLAN_ENTRY_SCHEMA_VERSION))
+  .refine(datesInOrder, DATES_IN_ORDER_ISSUE);
 
 // Moving an entry or changing its servings. The recipe cannot be changed.
 export const mealPlanEntryUpdateSchema = mealPlanEntrySchema

@@ -1,4 +1,4 @@
-import { recipeSchema } from "../recipeSchema";
+import { recipeSchema, storedRecipeSchema } from "../recipeSchema";
 
 const ingredient = { name: "Flour", quantity: 200, unit: "g" };
 
@@ -161,5 +161,63 @@ describe("recipeSchema", () => {
     expect(accepts(null)).toBe(false);
     expect(accepts({ ...valid, title: undefined })).toBe(false);
     expect(accepts({ ...valid, steps: "Mix" })).toBe(false);
+  });
+});
+
+describe("storedRecipeSchema", () => {
+  const stored = {
+    ...valid,
+    mealTypes: ["dinner"],
+    dietTags: [],
+    createdAt: Date.UTC(2026, 9, 1),
+    updatedAt: Date.UTC(2026, 9, 2),
+    schemaVersion: 1,
+  };
+  const acceptsStored = (input: unknown) => storedRecipeSchema.safeParse(input).success;
+
+  it("accepts a saved recipe, deleted or not, and drops the id and unknown fields", () => {
+    const result = storedRecipeSchema.safeParse({ ...stored, id: "abc", isAdmin: true });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(stored);
+    expect(acceptsStored({ ...stored, deletedAt: Date.UTC(2026, 9, 2) })).toBe(true);
+  });
+
+  it("accepts the same optional fields as the Security Rules", () => {
+    expect(
+      acceptsStored({ ...stored, description: "", prepTimeMinutes: 0, cookTimeMinutes: 1440, notes: "Warm" }),
+    ).toBe(true);
+  });
+
+  it("stores tags in vocabulary order", () => {
+    expect(storedRecipeSchema.parse({ ...stored, mealTypes: ["dinner", "breakfast"] }).mealTypes).toEqual([
+      "breakfast",
+      "dinner",
+    ]);
+  });
+
+  it.each([
+    { mealTypes: undefined }, // required here (the form's default doesn't apply)
+    { dietTags: undefined },
+    { mealTypes: ["dinner", "dinner"] }, // the Rules refuse duplicates
+    { dietTags: ["vegan", "vegan"] },
+    { createdAt: undefined },
+    { createdAt: "2026-10-01" },
+    { createdAt: 1.5 },
+    { createdAt: Date.UTC(2019, 11, 31) },
+    { updatedAt: Date.UTC(2101, 0, 1) },
+    { updatedAt: Date.UTC(2026, 8, 30) }, // before createdAt
+    { deletedAt: null },
+    { deletedAt: -1 },
+    { schemaVersion: 2 },
+    { schemaVersion: undefined },
+    { title: "'; DROP TABLE recipes;--" },
+    { title: "<script>alert(1)</script>" },
+    { ingredients: [{ name: "Flour", quantity: 1, unit: "handful" }] },
+  ])("rejects %p", (patch) => {
+    expect(acceptsStored({ ...stored, ...patch })).toBe(false);
+  });
+
+  it("cleans text read back the same way as the form does", () => {
+    expect(storedRecipeSchema.parse({ ...stored, title: " Pan​cakes " }).title).toBe("Pancakes");
   });
 });

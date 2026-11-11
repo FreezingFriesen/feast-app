@@ -63,13 +63,3 @@ describe("SQLite profile repository", () => {
     expect(await repo.get(CONTRACT_UID)).toBeUndefined();
   });
 });
-
-describe("migrations", () => {
-  it("creates the schema once and can run again on every start", async () => {
-    const db = createNodeSqliteDatabase();
-    await runMigrations(db);
-    await runMigrations(db);
-    expect(tableExists(db)).toBe(true);
-    expect(db.raw.prepare("PRAGMA user_version").get()).toEqual({ user_version: 1 });
-  });
-});

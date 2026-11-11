@@ -1,8 +1,8 @@
 // The composition root: the only place that picks implementations.
-import { createInMemoryMealPlanRepository } from "@/repositories/inMemoryMealPlanRepository";
-import { createInMemoryRecipeRepository } from "@/repositories/inMemoryRecipeRepository";
 import type { Repositories } from "@/repositories/RepositoryProvider";
+import { createSqliteMealPlanRepository } from "@/repositories/sqliteMealPlanRepository";
 import { createSqliteProfileRepository } from "@/repositories/sqliteProfileRepository";
+import { createSqliteRecipeRepository } from "@/repositories/sqliteRecipeRepository";
 import type { SqlDatabase } from "@/storage/SqlDatabase";
 import { backendSchema, type Backend } from "@/validation/configSchema";
 import { createLocalDataWiper } from "./account/LocalDataWiper";
@@ -108,11 +108,11 @@ export function createAppServices({
   now = Date.now,
   latencyMs = 0,
 }: AppServicesOptions): AppServices {
-  // Local data stays real whichever backend is chosen. Recipes and meal plans move to
-  // SQLite with #1.
+  // Local data stays real whichever backend is chosen: recipes, the meal plan and the
+  // profile all live in the phone's SQLite database (#1), even with the in-memory backend.
   const repositories: Repositories = {
-    recipes: createInMemoryRecipeRepository(now),
-    mealPlans: createInMemoryMealPlanRepository(now),
+    recipes: createSqliteRecipeRepository(database, now),
+    mealPlans: createSqliteMealPlanRepository(database, now),
     profiles: createSqliteProfileRepository(database, now),
   };
 

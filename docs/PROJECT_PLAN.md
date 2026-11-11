@@ -31,7 +31,7 @@ IDs: `#n` = user story from the product backlog. `N-nn` = feature added during
 planning (no backlog ID yet).
 
 ### Recipes
-- [ ] #1 Store recipes on the device
+- [x] #1 Store recipes on the device
 - [ ] N-01 Create, view, edit and delete recipes manually (each edit sets `updatedAt`)
 - [ ] #8 Adjust serving size; ingredient amounts scale to match
 - [ ] #5 Tag recipes by diet (e.g. keto)
@@ -41,6 +41,10 @@ planning (no backlog ID yet).
 - [ ] N-03 Filter stored recipes by ingredients, diet, allergies, and high/low protein, fiber, etc.
 - [ ] N-04 Filter by the user's profile restrictions **by default**, with a toggle to turn it off and a clear indicator while it is off
 
+Status: recipes are stored in SQLite and survive a restart (#1). `RecipeRepository`
+also has `update` and `remove` (soft delete), but N-01's edit and delete screens
+aren't built yet.
+
 ### Meal planning
 - [ ] #4 Weekly meal planner
 - [ ] #17 Breakfast, Lunch and Dinner slots for each day
@@ -48,7 +52,7 @@ planning (no backlog ID yet).
 - [ ] N-06 Estimated cost shown for the meal plan
 
 Status: Month/Week planner UI, assign/move/remove and servings are built
-(#4, #17, N-05). Entries are stored in memory until #1 (SQLite) lands.
+(#4, #17, N-05). Entries are stored in SQLite and survive a restart (#1).
 N-06 is waiting on ingredient price data.
 
 ### Grocery lists
@@ -152,8 +156,20 @@ exists. Account tab phases:
   throws is a `DomainError` (`src/services/domainErrors.ts`): a plain `Error` with a
   `code`, not a subclass. Screens never see Firebase error codes.
 - **Local database:** `expo-sqlite` (`feast.db`). The schema lives in
-  `src/storage/migrations.ts` as numbered, constant SQL migrations. Version 1 is
-  `profiles`; recipes and meal plans (#1) add version 2 onwards.
+  `src/storage/migrations.ts` as numbered, constant SQL migrations: 1 `profiles`,
+  2 `recipes`, 3 `meal_plan_entries` (#1). Lists are stored as JSON text, length-capped
+  before parsing, and every row read back is validated with the stored-record schemas
+  (`storedRecipeSchema`, `storedMealPlanEntrySchema`); a row that fails reads as missing.
+  The same repositories are used with both backends.
+- **Sync hooks (ready for N-19):** recipes and meal plan entries have a `dirty` column
+  (1 = changed on this phone and not uploaded). Both repositories add `Syncable`
+  (`src/repositories/Syncable.ts`): `listPending` (dirty records, deleted ones included,
+  as `{ id, data }` where `data` is exactly the Firestore document), `pendingCount`,
+  `markSynced(id, updatedAt)` (only if `updatedAt` still matches, so an edit made during
+  an upload is uploaded next time) and `mergeIncoming` (last edit wins; a tie keeps the
+  local copy; a deleted record is never brought back, even by a newer copy that isn't
+  deleted). Edits never move `updatedAt` backwards, and SQLite edits are written only if
+  the row is still the one that was read, so a download landing mid-edit isn't lost.
 - **Web build:** `web.output` is `single` in `app.json`, not `static`. With `static`,
   the SDK 57 dev server fails with "Worker chunk not found" because it can't bundle
   expo-sqlite's web worker. `metro.config.js` adds `.wasm` as an asset type for the
@@ -257,8 +273,21 @@ To be planned.
   local data; email verification is shown but doesn't block use; username change
   only in the optional last phase.
   - Until sync exists, wiping on log out deletes recipes and meal plans for good,
-    because they aren't backed up anywhere. Consider switching the wipe off until
-    sync lands.
+    because they aren't backed up anywhere. Now that they are kept in SQLite (#1), this
+    is the only way they are lost. Consider switching the wipe off until sync lands.
+- Local recipes and meal plans aren't tied to an account yet (no `uid` column), so a
+  second account on the same phone sees them unless the wipe ran. A later task decides
+  how local data is tied to an account.
+- Known limits of the sync hooks (for N-19):
+  - `mergeIncoming` for meal plans doesn't apply the 10-entries-per-slot limit (the
+    server doesn't either; refusing a download would leave phones with different plans),
+    so a slot can end up with more than 10. Its entries can still be edited, but nothing
+    more can be added or moved in.
+  - A pending row that fails validation (a corrupted or tampered database) is never
+    uploaded and stays pending, so `pendingCount` never reaches 0 while it is there.
+  - Removing a recipe doesn't remove the meal plan entries that use it. They show as
+    "Recipe unavailable" and can still be removed. A download can also bring an entry
+    before its recipe, which looks the same until the recipe arrives.
 - The Account page says recipes are filtered by dietary restrictions by default
   (N-04), but that filter isn't built yet.
 - Re-authenticating (e.g. to change password) doesn't restart the 30-day session
@@ -343,8 +372,8 @@ To be planned.
   full list is at the top of `firestore.rules`. A Cloud Function (Blaze plan) could
   check them on the server later. No data model change is planned for this.
 - The recipe Rules accept an optional `allergens` list (the data model computes it from
-  the ingredients), but `recipeSchema` doesn't produce it yet. Add it there when the
-  allergen computation is built. `source` in the data model isn't in `recipeSchema`
+  the ingredients), but `recipeSchema` doesn't produce it yet, and `storedRecipeSchema`
+  drops it from downloads. Add it to both when the allergen computation is built. `source` in the data model isn't in `recipeSchema`
   either, so the Rules refuse it until recipe import is built (the ingredient row's
   `rawText` isn't in `ingredientRowSchema`, and rows aren't checked by the Rules).
 - Plan Sprints 2 and 3; confirm how the rubric's hours-per-person applies to a

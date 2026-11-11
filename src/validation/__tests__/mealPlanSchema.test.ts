@@ -4,6 +4,7 @@ import {
   mealPlanEntrySchema,
   mealPlanEntryUpdateSchema,
   plannerSlotParamsSchema,
+  storedMealPlanEntrySchema,
 } from "../mealPlanSchema";
 
 const valid = {
@@ -136,5 +137,38 @@ describe("route param schemas", () => {
 
   it.each(ATTACK_STRINGS)("rejects attack input as an entry ID %#", (attack) => {
     expect(mealPlanEntryIdSchema.safeParse(attack).success).toBe(false);
+  });
+});
+
+describe("storedMealPlanEntrySchema", () => {
+  const stored = {
+    ...valid,
+    createdAt: Date.UTC(2026, 9, 1),
+    updatedAt: Date.UTC(2026, 9, 2),
+    schemaVersion: 1,
+  };
+  const acceptsStored = (input: unknown) => storedMealPlanEntrySchema.safeParse(input).success;
+
+  it("accepts a saved entry, removed or not, and drops the id and unknown fields", () => {
+    const result = storedMealPlanEntrySchema.safeParse({ ...stored, id: "abc", isAdmin: true });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(stored);
+    expect(acceptsStored({ ...stored, deletedAt: Date.UTC(2026, 9, 2) })).toBe(true);
+  });
+
+  it.each([
+    { createdAt: undefined },
+    { createdAt: "2026-10-01" },
+    { createdAt: 1.5 },
+    { createdAt: Date.UTC(2019, 11, 31) },
+    { updatedAt: Date.UTC(2101, 0, 1) },
+    { updatedAt: Date.UTC(2026, 8, 30) }, // before createdAt
+    { deletedAt: null },
+    { schemaVersion: 2 },
+    { recipeId: "'; DROP TABLE recipes;--" },
+    { date: "<script>alert(1)</script>" },
+    { mealType: "snack" },
+  ])("rejects %p", (patch) => {
+    expect(acceptsStored({ ...stored, ...patch })).toBe(false);
   });
 });

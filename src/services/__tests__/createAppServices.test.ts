@@ -54,8 +54,7 @@ describe("resolveBackend", () => {
   });
 });
 
-async function setup(backend: Backend) {
-  const database = createNodeSqliteDatabase();
+async function setup(backend: Backend, database = createNodeSqliteDatabase()) {
   await runMigrations(database);
   const secure = createMemorySecureKeyValue();
   const app = createAppServices({
@@ -64,8 +63,15 @@ async function setup(backend: Backend) {
     secure: secure.store,
     connectivity: createFakeConnectivity().service,
   });
-  return { ...app, secureItems: secure.items };
+  return { ...app, database, secureItems: secure.items };
 }
+
+const RECIPE = {
+  title: "Pancakes",
+  servings: 4,
+  ingredients: [{ name: "Flour", quantity: 200, unit: "g" }],
+  steps: ["Mix", "Cook"],
+};
 
 describe("createAppServices with the in-memory backend", () => {
   it("wires sign up, username claim, the SQLite profile, the session and the wipe together", async () => {
@@ -85,6 +91,28 @@ describe("createAppServices with the in-memory backend", () => {
 
     await services.localData.wipe();
     expect(await repositories.profiles.get(signUp.user.uid)).toBeUndefined();
+  });
+
+  it("keeps recipes and the meal plan in SQLite: they survive a restart, and the wipe clears them", async () => {
+    const first = await setup("memory");
+    const created = await first.repositories.recipes.create(RECIPE);
+    if (!created.ok) throw new Error("Expected the recipe to be created");
+    const added = await first.repositories.mealPlans.add({
+      date: "2026-10-19",
+      mealType: "dinner",
+      recipeId: created.recipe.id,
+      servings: 4,
+    });
+    if (!added.ok) throw new Error(added.reason);
+
+    // A restart: the same database file, everything else built again.
+    const restarted = await setup("memory", first.database);
+    expect(await restarted.repositories.recipes.list()).toEqual([created.recipe]);
+    expect(await restarted.repositories.mealPlans.getById(added.entry.id)).toEqual(added.entry);
+
+    await restarted.services.localData.wipe();
+    expect(await restarted.repositories.recipes.list()).toEqual([]);
+    expect(await restarted.repositories.mealPlans.getById(added.entry.id)).toBeUndefined();
   });
 
   it("never loads the Firebase SDK or reads the Firebase values", async () => {

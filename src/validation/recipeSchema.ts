@@ -8,6 +8,19 @@
 import { z } from "zod";
 import { cleanText } from "./clean";
 import { NAME_PATTERN } from "./patterns";
+import { DATES_IN_ORDER_ISSUE, datesInOrder, noDuplicates, storedRecordFields } from "./storedRecord";
+
+// The version of the stored recipe format. Raise it if the fields change.
+export const RECIPE_SCHEMA_VERSION = 1;
+
+// List and text limits. The Security Rules mirror the list sizes; they can't check the
+// items inside a list (see the top of firestore.rules). The SQLite repository works out
+// its JSON column caps from these.
+export const MAX_INGREDIENTS = 50;
+export const MAX_STEPS = 50;
+export const MAX_STEP_LENGTH = 1000;
+// For each of an ingredient row's ingredientId, name and note.
+export const MAX_INGREDIENT_FIELD_LENGTH = 100;
 
 // Constants for allowed values in the recipe schema
 export const UNITS = ["g","kg","ml","l","tsp","tbsp","cup","oz","lb","piece","pinch"] as const;
@@ -35,11 +48,11 @@ export function inVocabularyOrder<T extends string>(vocabulary: readonly T[]) {
 
 // Schema for a single ingredient row in a recipe
 export const ingredientRowSchema = z.object({
-  ingredientId: z.string().max(100).optional(),   // empty = unmatched
-  name: safeName(100),
+  ingredientId: z.string().max(MAX_INGREDIENT_FIELD_LENGTH).optional(),   // empty = unmatched
+  name: safeName(MAX_INGREDIENT_FIELD_LENGTH),
   quantity: z.number().positive().max(100000),
   unit: z.enum(UNITS),
-  note: safeText(0, 100).optional(),
+  note: safeText(0, MAX_INGREDIENT_FIELD_LENGTH).optional(),
 });
 
 // Main schema for validating a recipe object
@@ -50,8 +63,21 @@ export const recipeSchema = z.object({
   prepTimeMinutes: z.number().int().min(0).max(1440).optional(),
   cookTimeMinutes: z.number().int().min(0).max(1440).optional(),
   mealTypes: z.array(z.enum(MEAL_TYPES)).max(4).transform(inVocabularyOrder(MEAL_TYPES)).default([]),
-  ingredients: z.array(ingredientRowSchema).min(1).max(50),
-  steps: z.array(safeText(1, 1000)).min(1).max(50),
+  ingredients: z.array(ingredientRowSchema).min(1).max(MAX_INGREDIENTS),
+  steps: z.array(safeText(1, MAX_STEP_LENGTH)).min(1).max(MAX_STEPS),
   dietTags: z.array(z.enum(DIET_TAGS)).max(6).transform(inVocabularyOrder(DIET_TAGS)).default([]),
   notes: safeText(0, 1000).optional(),
 });
+
+// A saved recipe as it is stored on the phone and synced: the recipe fields plus the
+// fields the repository sets. Data read back from SQLite or downloaded is checked with
+// this. It accepts the same fields as validRecipe in firestore.rules, and checks more
+// inside the lists (each ingredient row and step), which the Rules can't.
+// The tag lists are required here (the Rules require them) and can't hold duplicates.
+export const storedRecipeSchema = recipeSchema
+  .extend({
+    mealTypes: z.array(z.enum(MEAL_TYPES)).max(4).refine(noDuplicates).transform(inVocabularyOrder(MEAL_TYPES)),
+    dietTags: z.array(z.enum(DIET_TAGS)).max(6).refine(noDuplicates).transform(inVocabularyOrder(DIET_TAGS)),
+    ...storedRecordFields(RECIPE_SCHEMA_VERSION),
+  })
+  .refine(datesInOrder, DATES_IN_ORDER_ISSUE);
