@@ -7,7 +7,7 @@
 // such as length limits and allowed values.
 import { z } from "zod";
 import { cleanText } from "./clean";
-import { NAME_PATTERN } from "./patterns";
+import { ID_PATTERN, NAME_PATTERN } from "./patterns";
 import { DATES_IN_ORDER_ISSUE, datesInOrder, noDuplicates, storedRecordFields } from "./storedRecord";
 
 // The version of the stored recipe format. Raise it if the fields change.
@@ -45,6 +45,10 @@ const safeName = (max: number) =>
 export function inVocabularyOrder<T extends string>(vocabulary: readonly T[]) {
   return (values: T[]): T[] => vocabulary.filter((value) => values.includes(value));
 }
+
+// A recipe's ID, e.g. from the link that opens the edit screen. Route params can come
+// from a deep link, so they are checked like any other user input.
+export const recipeIdSchema = z.string().max(100).regex(ID_PATTERN);
 
 // Schema for a single ingredient row in a recipe
 export const ingredientRowSchema = z.object({

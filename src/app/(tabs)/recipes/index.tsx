@@ -1,11 +1,12 @@
 // The Recipes tab: a list of the user's saved recipes (#1, N-01).
+import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { EmptyState } from "@/components/EmptyState";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { HeaderTextButton } from "@/components/HeaderTextButton";
 import { useRecipes } from "@/features/recipes/useRecipes";
-import { borderWidth, colors, radius, spacing, typography } from "@/theme";
+import { borderWidth, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import { Link, Stack, useRouter } from "expo-router";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 // This screen displays a list of recipes and allows the user to navigate to the "New Recipe" screen.
 export default function RecipesScreen() {
@@ -42,13 +43,25 @@ export default function RecipesScreen() {
             <SubmitButton label="Create a recipe" onPress={() => router.navigate("/recipes/new")} />
           </EmptyState>
         }
-        // Render each recipe item in the list with its title, number of servings, and number of ingredients.
+        // Render each recipe item in the list with its title, number of servings, and number of ingredients,
+        // plus an edit button. Only the button opens the editor: tapping the row itself is
+        // kept for the recipe detail screen (not built yet), so a stray tap can't start an edit.
         renderItem={({ item }) => (
           <View style={styles.item}>
-            <Text style={styles.itemTitle}>{item.title}</Text>
-            <Text style={styles.itemMeta}>
-              {item.servings} servings · {item.ingredients.length} ingredients
-            </Text>
+            <View style={styles.itemText}>
+              <Text style={styles.itemTitle}>{item.title}</Text>
+              <Text style={styles.itemMeta}>
+                {item.servings} servings · {item.ingredients.length} ingredients
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => router.push({ pathname: "/recipes/edit/[id]", params: { id: item.id } })}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.title}`}
+              style={styles.editButton}
+            >
+              <DecorativeIcon name="create-outline" size={iconSize.lg} color={colors.action} />
+            </Pressable>
           </View>
         )}
       />
@@ -67,11 +80,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   item: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     borderWidth: borderWidth.thin,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.lg,
     backgroundColor: colors.surface,
+  },
+  // Takes the room the edit button doesn't, so long titles wrap instead of pushing it off.
+  itemText: {
+    flex: 1,
   },
   itemTitle: {
     ...typography.itemTitle,
@@ -81,5 +101,15 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     marginTop: spacing.xxs,
+  },
+  // A 44-point square around the pencil icon. The negative margins keep the row as
+  // tall as it was, and line the icon up with the card's padding.
+  editButton: {
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: -spacing.sm,
+    marginRight: -spacing.sm,
   },
 });

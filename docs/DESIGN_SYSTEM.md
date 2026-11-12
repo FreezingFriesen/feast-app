@@ -216,6 +216,13 @@ Feature components follow the same tokens:
 - `DaySlots`: slot headings, meal cards with a meal-type icon tile.
 - `MonthGrid`: outlined markers in fixed positions.
 - `features/account/components/SignedOutSection`: the welcome screen.
+- `features/recipes/components/RecipeForm`: the recipe form shared by New Recipe and
+  Edit Recipe (text boxes, chips, ingredient cards, steps). It takes `initialValues`,
+  the button labels and `onSubmit`, and never saves anything itself. On edit, the save
+  button stays disabled until something changes.
+- Recipe list rows (`recipes/index`): border-only cards with a trailing edit button
+  (green pencil, 44pt, labelled "Edit <title>"). Only the button opens the editor;
+  tapping the row itself is kept for the detail screen.
 
 ## Navigation chrome
 - **Header:**
@@ -248,8 +255,9 @@ Feature components follow the same tokens:
 
 | Route | Mockup | Status | Plan IDs |
 |---|---|---|---|
-| `(tabs)/recipes/index` | none (brand defaults) | Done | #1, N-01 |
+| `(tabs)/recipes/index` | none (brand defaults) | Done; each row has an edit button | #1, N-01 |
 | `(tabs)/recipes/new` | none (brand defaults) | Done | N-01, #5 |
+| `(tabs)/recipes/edit/[id]` | none (brand defaults) | Done (same form as new) | N-01 |
 | recipe detail | `04-recipe-detail.png` | **Not built** (no route) | N-01, #8 |
 | `(tabs)/meal-planner/index` (week) | `02-meal-planner-week-filled.png` | Done, minus photos, swap and expand | #4, #17, N-05 |
 | `(tabs)/meal-planner/index` (month) | none (brand defaults) | Done | #4 |

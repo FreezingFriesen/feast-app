@@ -1,4 +1,4 @@
-import { recipeSchema, storedRecipeSchema } from "../recipeSchema";
+import { recipeIdSchema, recipeSchema, storedRecipeSchema } from "../recipeSchema";
 
 const ingredient = { name: "Flour", quantity: 200, unit: "g" };
 
@@ -161,6 +161,30 @@ describe("recipeSchema", () => {
     expect(accepts(null)).toBe(false);
     expect(accepts({ ...valid, title: undefined })).toBe(false);
     expect(accepts({ ...valid, steps: "Mix" })).toBe(false);
+  });
+});
+
+// The edit screen's route param (/recipes/edit/[id]) can come from a deep link.
+describe("recipeIdSchema", () => {
+  it.each(["a", "recipe-ab_12", "recipe_1234-abcd", "a".repeat(100)])("accepts %p", (id) => {
+    expect(recipeIdSchema.safeParse(id).success).toBe(true);
+  });
+
+  it.each([
+    ["empty", ""],
+    ["a path", "../x"],
+    ["a slash", "a/b"],
+    ["capitals", "ABC"],
+    ["a space", "abc def"],
+    ["101 characters", "a".repeat(101)],
+    ["a repeated param (array)", ["a"]],
+    ["missing", undefined],
+    ["a number", 1],
+    ["SQL injection", "'; DROP TABLE recipes;--"],
+    ["a script tag", "<script>alert(1)</script>"],
+    ["an emoji", "🍕"],
+  ])("rejects %s", (_label, id) => {
+    expect(recipeIdSchema.safeParse(id).success).toBe(false);
   });
 });
 

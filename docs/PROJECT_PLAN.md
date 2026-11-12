@@ -41,9 +41,14 @@ planning (no backlog ID yet).
 - [ ] N-03 Filter stored recipes by ingredients, diet, allergies, and high/low protein, fiber, etc.
 - [ ] N-04 Filter by the user's profile restrictions **by default**, with a toggle to turn it off and a clear indicator while it is off
 
-Status: recipes are stored in SQLite and survive a restart (#1). `RecipeRepository`
-also has `update` and `remove` (soft delete), but N-01's edit and delete screens
-aren't built yet.
+Status: recipes are stored in SQLite and survive a restart (#1). Editing is built
+(N-01): each row in the recipe list has an edit button that opens `recipes/edit/[id]`.
+It uses the same `RecipeForm` as New Recipe and saves through `RecipeRepository.update`
+(on the phone first, synced later). An ingredient's `ingredientId` and `note`, which the
+form doesn't show, are kept, and the `ingredientId` is dropped if the ingredient is
+renamed, so it reads as unmatched. Still to do for N-01: the recipe detail screen and
+delete (`remove`, a soft delete, is in the repository but no screen uses it). Leaving
+the edit screen doesn't ask before discarding changes (needs Expo SDK 58, see Open items).
 
 ### Meal planning
 - [ ] #4 Weekly meal planner
@@ -481,7 +486,9 @@ To be planned.
 - Decide which phones the team tests on (iOS, Android, or both).
 - Upgrade to Expo SDK 58. It fixes the `decode-uri-component` advisory in
   expo-router's deep-link parsing (moderate DoS, ships in the app). Everyone on
-  the team needs an Expo Go that supports SDK 58.
+  the team needs an Expo Go that supports SDK 58. It also adds `usePreventRemove`
+  (documented from SDK 58), which the recipe edit screen can use to ask before
+  discarding unsaved changes.
 - Known `npm audit` advisories with no upstream fix yet, dev tooling only (not in
   the app): `braces` (Metro/Jest), `node-forge` (Expo CLI), the copy of `zod`
   nested inside `@expo/cli`, and `uuid` under `@expo/ngrok`. `@expo/ngrok` is a

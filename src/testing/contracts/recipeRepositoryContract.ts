@@ -175,6 +175,20 @@ export function describeRecipeRepositoryContract(
         expect(await repo.getById(recipe.id)).not.toHaveProperty("notes");
       });
 
+      // The edit screen sends every row back with its ingredientId and note (which the form
+      // doesn't show), so an edit must store them, not drop them.
+      it("keeps ingredientId and note on ingredient rows", async () => {
+        const { repo } = await setup();
+        const recipe = expectCreated(await repo.create(RECIPE_INPUT));
+        const ingredients = [
+          { ingredientId: "apple", name: "Apples", quantity: 6, unit: "piece", note: "tart" },
+          { name: "Sugar", quantity: 100, unit: "g" },
+        ];
+        const updated = expectUpdated(await repo.update(recipe.id, { ...RECIPE_INPUT, ingredients }));
+        expect(updated.ingredients).toStrictEqual(ingredients);
+        expect((await repo.getById(recipe.id))?.ingredients).toStrictEqual(ingredients);
+      });
+
       it("ignores an id, createdAt or schemaVersion in the input", async () => {
         const { repo } = await setup();
         const recipe = expectCreated(await repo.create(RECIPE_INPUT));
