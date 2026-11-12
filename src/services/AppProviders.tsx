@@ -2,6 +2,7 @@ import { PlaceholderScreen } from "@/components/PlaceholderScreen";
 import { SessionStatusProvider } from "@/features/account/SessionStatusProvider";
 import { RepositoryProvider } from "@/repositories/RepositoryProvider";
 import { openAppDatabase } from "@/storage/expoSqliteDatabase";
+import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState, type ReactNode } from "react";
 import { createExpoNetworkConnectivity } from "./connectivity/expoNetworkConnectivity";
 import { createAppServices, DEV_LATENCY_MS, resolveBackend, type AppServices } from "./createAppServices";
@@ -15,6 +16,10 @@ type Startup =
   | { status: "loading" }
   | { status: "ready"; app: AppServices }
   | { status: "failed"; noBackend: boolean };
+
+// The splash screen hides once startup has finished, or after this long at most, so a
+// startup that never finishes can't leave the splash up for ever.
+const SPLASH_TIMEOUT_MS = 10_000;
 
 // Everything that has to happen before the first screen: pick the backend, open the
 // database on the phone, build the services, and restore a saved login.
@@ -58,6 +63,19 @@ export function AppProviders({ children }: { children: ReactNode }) {
       active = false;
     };
   }, []);
+
+  // The splash screen (held in src/app/_layout.tsx) covers startup. Hide it when
+  // startup has worked or failed, so the first screen or the error shows, and in any
+  // case after SPLASH_TIMEOUT_MS.
+  const starting = startup.status === "loading";
+  useEffect(() => {
+    if (!starting) {
+      SplashScreen.hide();
+      return;
+    }
+    const timer = setTimeout(() => SplashScreen.hide(), SPLASH_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [starting]);
 
   // Once started, sync recipes and meal plans in the foreground (N-19): straight away if a
   // saved login was restored, and on sign in, reconnecting and local changes after that.

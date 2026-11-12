@@ -1,5 +1,9 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## UI work
+
+Before changing any screen or component, read `docs/DESIGN_SYSTEM.md` and the "UI and design system" rules in `CLAUDE.md`. Build from the tokens in `src/theme/`; colour literals anywhere else in `src/` fail lint.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:

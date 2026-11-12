@@ -1,5 +1,6 @@
 import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
+import { spacing } from "@/theme";
 import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { LogOutButton } from "./LogOutButton";
@@ -40,6 +41,6 @@ export function IncompleteAccountSection(props: IncompleteAccountSectionProps) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    padding: spacing.lg,
   },
 });

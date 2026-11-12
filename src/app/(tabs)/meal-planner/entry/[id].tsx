@@ -1,8 +1,11 @@
 // Edit one planned meal: change its servings, move it to another day or slot,
 // or remove it from the plan.
+import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { ChipSelect, formatOptionLabel } from "@/components/form/ChipSelect";
 import { FieldError } from "@/components/form/FormField";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PlaceholderScreen } from "@/components/PlaceholderScreen";
+import { TextAction } from "@/components/TextAction";
 import { formatServings } from "@/features/meal-planner/components/DaySlots";
 import { WeekStrip } from "@/features/meal-planner/components/WeekStrip";
 import { formatDay, todayKey } from "@/features/meal-planner/dates";
@@ -10,6 +13,7 @@ import { writeErrorMessage } from "@/features/meal-planner/writeErrorMessage";
 import { useRecipesById } from "@/features/recipes/useRecipes";
 import type { MealPlanEntry } from "@/repositories/MealPlanRepository";
 import { useMealPlanRepository } from "@/repositories/RepositoryProvider";
+import { borderWidth, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import {
   MAX_SERVINGS,
   mealPlanEntryIdSchema,
@@ -130,7 +134,7 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
           accessibilityLabel="Fewer servings"
           style={[styles.stepperButton, servings <= MIN_SERVINGS && styles.disabled]}
         >
-          <Text style={styles.stepperText}>−</Text>
+          <DecorativeIcon name="remove" size={iconSize.lg} color={colors.action} />
         </Pressable>
         <Text style={styles.stepperValue} accessibilityLabel={formatServings(servings)}>
           {servings}
@@ -142,7 +146,7 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
           accessibilityLabel="More servings"
           style={[styles.stepperButton, servings >= MAX_SERVINGS && styles.disabled]}
         >
-          <Text style={styles.stepperText}>+</Text>
+          <DecorativeIcon name="add" size={iconSize.lg} color={colors.action} />
         </Pressable>
       </View>
 
@@ -163,101 +167,61 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
 
       {/* The error from the last save or remove, if it didn't work. */}
       {error ? <FieldError message={error} /> : null}
-      <Pressable
-        onPress={handleSave}
-        disabled={saving || !changed}
-        accessibilityRole="button"
-        style={[styles.saveButton, (saving || !changed) && styles.disabled]}
-      >
-        <Text style={styles.saveText}>{saving ? "Saving…" : "Save changes"}</Text>
-      </Pressable>
-      <Pressable
-        onPress={handleRemove}
-        disabled={saving}
-        accessibilityRole="button"
-        style={styles.removeButton}
-      >
-        <Text style={styles.removeText}>Remove from plan</Text>
-      </Pressable>
+      <SubmitButton label="Save changes" busyLabel="Saving…" busy={saving} disabled={!changed} onPress={handleSave} />
+      <TextAction label="Remove from plan" tone="destructive" disabled={saving} onPress={handleRemove} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 48,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxl,
   },
   recipeTitle: {
-    fontSize: 22,
-    fontWeight: "600",
+    ...typography.heading,
+    color: colors.text,
   },
   unavailable: {
-    color: "#999",
+    color: colors.textMuted,
     fontStyle: "italic",
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 20,
-    marginBottom: 8,
+    ...typography.groupHeading,
+    color: colors.action,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
   },
   stepper: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: spacing.lg,
   },
+  // Outlined green squares, like the servings buttons in the recipe mockup.
   stepperButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#208AEF",
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.thick,
+    borderColor: colors.action,
     alignItems: "center",
     justifyContent: "center",
   },
-  stepperText: {
-    color: "#208AEF",
-    fontSize: 22,
-    fontWeight: "600",
-  },
   stepperValue: {
-    fontSize: 20,
-    fontWeight: "600",
-    minWidth: 40,
+    ...typography.number,
+    color: colors.text,
+    minWidth: MIN_TOUCH_TARGET,
     textAlign: "center",
   },
   spacer: {
-    height: 12,
+    height: spacing.md,
   },
   summary: {
-    fontSize: 15,
-    color: "#666",
-    marginTop: 12,
-  },
-  saveButton: {
-    backgroundColor: "#208AEF",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 24,
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: spacing.md,
   },
   disabled: {
     opacity: 0.4,
-  },
-  saveText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  removeButton: {
-    alignItems: "center",
-    paddingVertical: 14,
-    marginTop: 8,
-  },
-  removeText: {
-    color: "#c62828",
-    fontSize: 16,
-    fontWeight: "600",
   },
 });

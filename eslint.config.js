@@ -18,6 +18,23 @@ const FIREBASE_ADMIN = {
 
 const restrict = (...patterns) => ({ "no-restricted-imports": ["error", { patterns }] });
 
+// Colours are written only in src/theme/ (see docs/DESIGN_SYSTEM.md). Anywhere else in
+// src/, a hex or rgb() value is a mistake: use a role such as colors.action.
+// A different rule from no-restricted-imports, so it doesn't replace the blocks above.
+const COLOR_LITERALS = {
+  "no-restricted-syntax": [
+    "error",
+    {
+      selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/]",
+      message: "Use a colour role from src/theme (e.g. colors.action), not a hex value.",
+    },
+    {
+      selector: "Literal[value=/^rgba?\\(/]",
+      message: "Use a colour role from src/theme (e.g. colors.action), not rgb()/rgba().",
+    },
+  ],
+};
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -45,5 +62,11 @@ module.exports = defineConfig([
   {
     files: ["scripts/**"],
     rules: restrict(FIREBASE_SDK),
+  },
+  // No colour values outside the theme. Tests may use them to check the theme.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/theme/**", "**/__tests__/**", "src/testing/**"],
+    rules: COLOR_LITERALS,
   },
 ]);

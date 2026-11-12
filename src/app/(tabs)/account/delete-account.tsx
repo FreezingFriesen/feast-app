@@ -6,7 +6,8 @@ import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { accountErrorMessage, accountFieldMessage, offlineMessage } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
-import { TextAction } from "@/features/account/components/TextAction";
+import { colors, spacing, typography } from "@/theme";
+import { TextAction } from "@/components/TextAction";
 import {
   confirmsUsername,
   deletionFailureView,
@@ -233,24 +234,25 @@ export default function DeleteAccountScreen() {
 
 const styles = StyleSheet.create({
   intro: {
-    fontSize: 16,
-    color: "#444",
-    marginBottom: 16,
+    ...typography.body,
+    color: colors.textMuted,
+    marginBottom: spacing.lg,
   },
   heading: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
+    ...typography.groupHeading,
+    color: colors.text,
+    marginBottom: spacing.sm,
   },
   item: {
-    fontSize: 16,
-    marginBottom: 6,
+    ...typography.body,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
+  // Red and bold, so the warning doesn't rely on colour alone.
   warning: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#c62828",
-    marginTop: 8,
-    marginBottom: 16,
+    ...typography.bodyStrong,
+    color: colors.error,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
   },
 });

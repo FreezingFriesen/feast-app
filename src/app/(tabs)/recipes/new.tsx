@@ -1,9 +1,12 @@
 // This screen allows the user to create a new recipe by filling out a form with various fields 
 // such as title, description, ingredients, steps, and diet tags. 
 // The form is validated before submission, and any errors are displayed to the user (N-01).
+import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { ChipSelect } from "@/components/form/ChipSelect";
 import { issuesToFieldErrors, type FieldErrors } from "@/components/form/fieldErrors";
 import { FieldError, FormField } from "@/components/form/FormField";
+import { SubmitButton } from "@/components/form/SubmitButton";
+import { TextAction } from "@/components/TextAction";
 import {
   emptyIngredientRow,
   emptyRecipeForm,
@@ -15,6 +18,7 @@ import {
   type RecipeFormValues,
 } from "@/features/recipes/recipeForm";
 import { useRecipeRepository } from "@/repositories/RepositoryProvider";
+import { borderWidth, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import { DIET_TAGS, MEAL_TYPES, recipeSchema, UNITS } from "@/validation/recipeSchema";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -209,29 +213,29 @@ export default function NewRecipeScreen() {
             ) : null}
             {/* A recipe needs at least one ingredient, so the last row can't be removed. */}
             {values.ingredients.length > 1 ? (
-              <Pressable
+              <TextAction
+                label="Remove ingredient"
+                accessibilityLabel={`Remove ingredient ${index + 1}`}
+                tone="destructive"
+                align="start"
                 onPress={() =>
                   setField(
                     "ingredients",
                     values.ingredients.filter((_, i) => i !== index),
                   )
                 }
-                accessibilityRole="button"
-              >
-                <Text style={styles.removeText}>Remove ingredient</Text>
-              </Pressable>
+              />
             ) : null}
           </View>
         ))}
         {errors.ingredients ? <FieldError message={errors.ingredients} /> : null}
         {/* The "Add" button disappears once the maximum number of rows is reached. */}
         {values.ingredients.length < MAX_INGREDIENT_ROWS ? (
-          <Pressable
+          <TextAction
+            label="+ Add ingredient"
+            align="start"
             onPress={() => setField("ingredients", [...values.ingredients, emptyIngredientRow()])}
-            accessibilityRole="button"
-          >
-            <Text style={styles.addText}>+ Add ingredient</Text>
-          </Pressable>
+          />
         ) : null}
 
         {/* Steps: numbered text boxes, with the same add and remove rules as ingredients. */}
@@ -253,21 +257,20 @@ export default function NewRecipeScreen() {
                 onPress={() => setField("steps", values.steps.filter((_, i) => i !== index))}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove step ${index + 1}`}
-                hitSlop={8}
+                style={styles.removeStep}
               >
-                <Text style={styles.removeText}>✕</Text>
+                <DecorativeIcon name="close-circle-outline" size={iconSize.lg} color={colors.error} />
               </Pressable>
             ) : null}
           </View>
         ))}
         {errors.steps ? <FieldError message={errors.steps} /> : null}
         {values.steps.length < MAX_STEP_ROWS ? (
-          <Pressable
+          <TextAction
+            label="+ Add step"
+            align="start"
             onPress={() => setField("steps", [...values.steps, emptyStepRow()])}
-            accessibilityRole="button"
-          >
-            <Text style={styles.addText}>+ Add step</Text>
-          </Pressable>
+          />
         ) : null}
 
         {/* Diet tags (#5): tap to pick any that apply, e.g. Vegan or Gluten free. */}
@@ -292,14 +295,8 @@ export default function NewRecipeScreen() {
 
         {/* A reminder by the save button, since the errors may be scrolled out of view. */}
         {hasErrors ? <FieldError message="Please fix the highlighted fields." /> : null}
-        <Pressable
-          onPress={handleSave}
-          disabled={saving}
-          accessibilityRole="button"
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-        >
-          <Text style={styles.saveText}>{saving ? "Saving…" : "Save recipe"}</Text>
-        </Pressable>
+        {/* Disabled while saving, so it can't be pressed twice. */}
+        <SubmitButton label="Save recipe" busyLabel="Saving…" busy={saving} onPress={handleSave} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -311,26 +308,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    padding: 16,
-    paddingBottom: 48,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxl,
   },
   row: {
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
   },
+  // Green section headings, as on the Account page.
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 12,
-    marginBottom: 8,
+    ...typography.groupHeading,
+    color: colors.action,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   card: {
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    gap: 4,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
   },
   nameInput: {
     minWidth: 160,
@@ -341,39 +340,22 @@ const styles = StyleSheet.create({
   stepRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 8,
+    gap: spacing.sm,
   },
+  // Lines the number up with the text inside the box next to it.
   stepNumber: {
-    fontSize: 16,
-    paddingTop: 10,
+    ...typography.bodyStrong,
+    color: colors.text,
+    paddingTop: spacing.md,
   },
-  addText: {
-    color: "#208AEF",
-    fontSize: 16,
-    fontWeight: "600",
-    paddingVertical: 8,
-  },
-  removeText: {
-    color: "#c62828",
-    fontSize: 14,
-    paddingVertical: 8,
+  // A 44-point square around the remove icon.
+  removeStep: {
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
   },
   spacer: {
-    height: 12,
-  },
-  saveButton: {
-    backgroundColor: "#208AEF",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    height: spacing.md,
   },
 });

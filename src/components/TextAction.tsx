@@ -1,3 +1,4 @@
+import { colors, spacing, typography } from "@/theme";
 import { Pressable, StyleSheet, Text } from "react-native";
 
 // The text, what happens when it's tapped, and whether it can be tapped right now.
@@ -7,19 +8,31 @@ type TextActionProps = {
   disabled?: boolean;
   // destructive: red, for actions like deleting an account.
   tone?: "default" | "destructive";
+  // center (the default) for actions under a form; start to line up with a list.
+  align?: "center" | "start";
+  // For screen readers, when the label alone isn't enough (e.g. "Remove ingredient 2").
+  accessibilityLabel?: string;
 };
 
-// A secondary action shown as text, like "Forgot password?" (same style as "+ Add step").
-export function TextAction({ label, onPress, disabled = false, tone = "default" }: TextActionProps) {
+// A secondary action shown as text, like "Forgot password?" or "+ Add step".
+export function TextAction({
+  label,
+  onPress,
+  disabled = false,
+  tone = "default",
+  align = "center",
+  accessibilityLabel,
+}: TextActionProps) {
   // hitSlop makes the tappable area 8 points bigger on every side than the text.
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       hitSlop={8}
-      style={styles.action}
+      style={[styles.action, align === "start" && styles.start]}
     >
       <Text style={[styles.text, tone === "destructive" && styles.destructive, disabled && styles.disabled]}>
         {label}
@@ -31,15 +44,17 @@ export function TextAction({ label, onPress, disabled = false, tone = "default" 
 const styles = StyleSheet.create({
   action: {
     alignSelf: "center",
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
+  },
+  start: {
+    alignSelf: "flex-start",
   },
   text: {
-    color: "#208AEF",
-    fontSize: 16,
-    fontWeight: "600",
+    ...typography.bodyStrong,
+    color: colors.action,
   },
   destructive: {
-    color: "#c62828",
+    color: colors.error,
   },
   disabled: {
     opacity: 0.4,

@@ -1,4 +1,6 @@
+import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { formatOptionLabel } from "@/components/form/ChipSelect";
+import { borderWidth, colors, iconSize, MARKER_SIZE, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import { PLANNER_MEAL_TYPES } from "@/validation/mealPlanSchema";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
@@ -10,7 +12,11 @@ import {
   type DateKey,
 } from "../dates";
 import type { DaySlotEntries } from "../groupEntries";
-import { MEAL_TYPE_COLORS } from "../mealTypeColors";
+import { MEAL_MARKER_OUTLINE, MEAL_TYPE_COLORS } from "../mealTypeColors";
+
+// The height of one day in the calendar, and of the circle round its number.
+const CELL_HEIGHT = 56;
+const DAY_CIRCLE_SIZE = 30;
 
 type MonthGridProps = {
   // Any day in the month to show.
@@ -27,7 +33,9 @@ type MonthGridProps = {
   onChangeMonth: (months: number) => void;
 };
 
-// Calendar for one month. Each day shows a dot for every slot with a meal planned.
+// Calendar for one month. Each day shows a marker for every slot with a meal planned.
+// The markers are always in the same place (breakfast, lunch, dinner, left to right) and
+// have an outline, so they don't depend on colour alone.
 export function MonthGrid({
   monthKey,
   todayKey,
@@ -38,25 +46,27 @@ export function MonthGrid({
 }: MonthGridProps) {
   return (
     <View style={styles.container}>
-      {/* The top line: previous-month arrow, "November 2026", next-month arrow. */}
+      {/* The top line: "NOVEMBER 2026", then the previous- and next-month arrows. */}
       <View style={styles.header}>
-        <Pressable
-          onPress={() => onChangeMonth(-1)}
-          accessibilityRole="button"
-          accessibilityLabel="Previous month"
-          hitSlop={12}
-        >
-          <Text style={styles.arrow}>‹</Text>
-        </Pressable>
         <Text style={styles.month}>{formatMonthYear(monthKey)}</Text>
-        <Pressable
-          onPress={() => onChangeMonth(1)}
-          accessibilityRole="button"
-          accessibilityLabel="Next month"
-          hitSlop={12}
-        >
-          <Text style={styles.arrow}>›</Text>
-        </Pressable>
+        <View style={styles.arrows}>
+          <Pressable
+            onPress={() => onChangeMonth(-1)}
+            accessibilityRole="button"
+            accessibilityLabel="Previous month"
+            style={styles.arrow}
+          >
+            <DecorativeIcon name="chevron-back" size={iconSize.lg} color={colors.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => onChangeMonth(1)}
+            accessibilityRole="button"
+            accessibilityLabel="Next month"
+            style={styles.arrow}
+          >
+            <DecorativeIcon name="chevron-forward" size={iconSize.lg} color={colors.text} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Column headings, Mon to Sun. */}
@@ -81,7 +91,7 @@ export function MonthGrid({
             const isToday = key === todayKey;
             const isSelected = key === selectedKey;
             return (
-              // Screen readers hear the date and what's planned, since they can't see the dots.
+              // Screen readers hear the date and what's planned, since they can't see the markers.
               <Pressable
                 key={key}
                 onPress={() => onPressDay(key)}
@@ -96,12 +106,16 @@ export function MonthGrid({
                 <View style={[styles.dayCircle, isToday && styles.todayCircle]}>
                   <Text style={[styles.dayNumber, isToday && styles.todayText]}>{dayOfMonth(key)}</Text>
                 </View>
-                {/* One coloured dot per meal type planned. */}
-                <View style={styles.dots}>
-                  {planned.map((mealType) => (
+                {/* A place for each meal type; only the planned ones are drawn. */}
+                <View style={styles.markers}>
+                  {PLANNER_MEAL_TYPES.map((mealType) => (
                     <View
                       key={mealType}
-                      style={[styles.dot, { backgroundColor: MEAL_TYPE_COLORS[mealType] }]}
+                      style={[
+                        styles.marker,
+                        { backgroundColor: MEAL_TYPE_COLORS[mealType] },
+                        !planned.includes(mealType) && styles.markerHidden,
+                      ]}
                     />
                   ))}
                 </View>
@@ -111,11 +125,11 @@ export function MonthGrid({
         </View>
       ))}
 
-      {/* The key under the calendar: which colour is which meal. */}
+      {/* The key under the calendar: which marker is which meal. */}
       <View style={styles.legend}>
         {PLANNER_MEAL_TYPES.map((mealType) => (
           <View key={mealType} style={styles.legendItem}>
-            <View style={[styles.dot, { backgroundColor: MEAL_TYPE_COLORS[mealType] }]} />
+            <View style={[styles.marker, { backgroundColor: MEAL_TYPE_COLORS[mealType] }]} />
             <Text style={styles.legendText}>{formatOptionLabel(mealType)}</Text>
           </View>
         ))}
@@ -126,84 +140,95 @@ export function MonthGrid({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 4,
+    gap: spacing.xs,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 4,
-    marginBottom: 4,
-  },
-  arrow: {
-    fontSize: 28,
-    color: "#208AEF",
-    paddingHorizontal: 8,
+    marginBottom: spacing.xs,
   },
   month: {
-    fontSize: 17,
-    fontWeight: "600",
+    ...typography.sectionLabel,
+    color: colors.text,
+  },
+  arrows: {
+    flexDirection: "row",
+  },
+  arrow: {
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
   },
   row: {
     flexDirection: "row",
   },
   weekday: {
+    ...typography.small,
     flex: 1,
     textAlign: "center",
-    fontSize: 12,
-    color: "#666",
-    paddingVertical: 4,
+    color: colors.textMuted,
+    paddingVertical: spacing.xs,
   },
   cell: {
     flex: 1,
-    height: 56,
+    height: CELL_HEIGHT,
     alignItems: "center",
-    paddingTop: 4,
-    borderRadius: 8,
+    paddingTop: spacing.xs,
+    borderRadius: radius.sm,
   },
   cellSelected: {
-    backgroundColor: "#e8f2fd",
+    backgroundColor: colors.selectedTint,
   },
   dayCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: DAY_CIRCLE_SIZE,
+    height: DAY_CIRCLE_SIZE,
+    borderRadius: DAY_CIRCLE_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
   },
   todayCircle: {
-    backgroundColor: "#208AEF",
+    backgroundColor: colors.action,
   },
   dayNumber: {
-    fontSize: 16,
+    ...typography.body,
+    color: colors.text,
   },
   todayText: {
-    color: "#fff",
-    fontWeight: "600",
+    ...typography.bodyStrong,
+    color: colors.onAction,
   },
-  dots: {
+  markers: {
     flexDirection: "row",
-    gap: 3,
-    marginTop: 3,
+    gap: spacing.xxs,
+    marginTop: spacing.xs,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  // A coloured dot with an ink outline.
+  marker: {
+    width: MARKER_SIZE,
+    height: MARKER_SIZE,
+    borderRadius: MARKER_SIZE / 2,
+    borderWidth: borderWidth.thin,
+    borderColor: MEAL_MARKER_OUTLINE,
+  },
+  // Keeps its place, so the other markers don't move.
+  markerHidden: {
+    opacity: 0,
   },
   legend: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 16,
-    marginTop: 8,
+    gap: spacing.lg,
+    marginTop: spacing.sm,
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.xs,
   },
   legendText: {
-    fontSize: 13,
-    color: "#666",
+    ...typography.caption,
+    color: colors.textMuted,
   },
 });

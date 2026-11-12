@@ -1,6 +1,7 @@
 // The meal planner (#4, #17, N-05). Month and Week tabs show the same plan:
 // the month view opens a popup for the tapped day, and the week view shows the
 // selected day's Breakfast, Lunch and Dinner slots under a strip of days.
+import { HeaderTextButton } from "@/components/HeaderTextButton";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { DaySlots } from "@/features/meal-planner/components/DaySlots";
 import { MonthGrid } from "@/features/meal-planner/components/MonthGrid";
@@ -10,9 +11,10 @@ import { emptyDaySlots, groupByDay } from "@/features/meal-planner/groupEntries"
 import { useMealPlanEntries } from "@/features/meal-planner/useMealPlanEntries";
 import { usePlannerNavigation } from "@/features/meal-planner/usePlannerNavigation";
 import { useRecipesById } from "@/features/recipes/useRecipes";
+import { colors, spacing, typography } from "@/theme";
 import { Stack } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { ScrollView, StyleSheet, Text } from "react-native";
 
 // The two tabs at the top of the planner. PlannerView is "month" or "week".
 const VIEWS = ["month", "week"] as const;
@@ -45,14 +47,7 @@ export default function MealPlannerScreen() {
             focusDate === today
               ? undefined
               : () => (
-                  <Pressable
-                    onPress={() => setFocusDate(today)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Go to today"
-                    hitSlop={8}
-                  >
-                    <Text style={styles.headerButton}>Today</Text>
-                  </Pressable>
+                  <HeaderTextButton label="Today" accessibilityLabel="Go to today" onPress={() => setFocusDate(today)} />
                 ),
         }}
       />
@@ -102,18 +97,12 @@ export default function MealPlannerScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 48,
-    gap: 16,
-  },
-  headerButton: {
-    color: "#208AEF",
-    fontSize: 16,
-    fontWeight: "600",
-    paddingHorizontal: 8,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
   },
   dayTitle: {
-    fontSize: 20,
-    fontWeight: "600",
+    ...typography.heading,
+    color: colors.text,
   },
 });

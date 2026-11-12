@@ -1,3 +1,4 @@
+import { spacing } from "@/theme";
 import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from "react-native";
 
@@ -21,7 +22,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    padding: 16,
-    paddingBottom: 48,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxl,
   },
 });

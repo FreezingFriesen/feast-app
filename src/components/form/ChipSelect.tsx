@@ -1,3 +1,5 @@
+import { DecorativeIcon } from "@/components/DecorativeIcon";
+import { borderWidth, CHIP_HEIGHT, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type ChipSelectProps<T extends string> = {
@@ -20,6 +22,7 @@ export function formatOptionLabel(value: string): string {
 // A row of tappable chips, one per option, with the selected ones highlighted.
 // Tapping a chip calls onToggle; the screen decides what's selected, so it works for
 // picking several (diet tags) or exactly one (a unit, a meal slot).
+// Selected chips are green and also get a tick, so selection isn't shown by colour alone.
 export function ChipSelect<T extends string>({
   options,
   selected,
@@ -36,8 +39,11 @@ export function ChipSelect<T extends string>({
             onPress={() => onToggle(option)}
             accessibilityRole="button"
             accessibilityState={{ selected: isSelected }}
+            // hitSlop makes the tappable area 44 points tall.
+            hitSlop={(MIN_TOUCH_TARGET - CHIP_HEIGHT) / 2}
             style={[styles.chip, isSelected && styles.chipSelected]}
           >
+            {isSelected ? <DecorativeIcon name="checkmark" size={iconSize.sm} color={colors.onAction} /> : null}
             <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
               {formatLabel(option)}
             </Text>
@@ -53,24 +59,28 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: spacing.sm,
   },
   chip: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: CHIP_HEIGHT,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.inputBorder,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
   },
   chipSelected: {
-    backgroundColor: "#208AEF",
-    borderColor: "#208AEF",
+    backgroundColor: colors.action,
+    borderColor: colors.action,
   },
   chipText: {
-    fontSize: 14,
+    ...typography.label,
+    color: colors.text,
   },
   chipTextSelected: {
-    color: "#fff",
+    color: colors.onAction,
   },
 });

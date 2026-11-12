@@ -1,3 +1,4 @@
+import { borderWidth, colors, CONTROL_HEIGHT, radius, spacing, typography } from "@/theme";
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
 
 // Everything a normal TextInput accepts, plus a label above it and an error below it.
@@ -6,8 +7,8 @@ type FormFieldProps = TextInputProps & {
   error?: string;
 };
 
-// A labelled text box used by every form. The box turns red and the message shows
-// underneath when there is an error.
+// A labelled text box used by every form. The box gets a thicker red edge and the
+// message shows underneath when there is an error.
 export function FormField({ label, error, style, multiline, ...inputProps }: FormFieldProps) {
   return (
     <View style={styles.container}>
@@ -19,7 +20,7 @@ export function FormField({ label, error, style, multiline, ...inputProps }: For
         multiline={multiline}
         accessibilityLabel={inputProps.accessibilityLabel ?? label}
         style={[styles.input, multiline && styles.multiline, error ? styles.inputError : null, style]}
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textMuted}
       />
       {error ? <FieldError message={error} /> : null}
     </View>
@@ -34,35 +35,38 @@ export function FieldError({ message }: { message: string }) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
     flexGrow: 1,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
+    ...typography.label,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#fff",
+    ...typography.body,
+    color: colors.text,
+    minHeight: CONTROL_HEIGHT,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.inputBorder,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
   },
   // Taller boxes for longer text, with the text starting at the top (Android
   // centres it otherwise).
   multiline: {
-    minHeight: 80,
+    minHeight: CONTROL_HEIGHT * 2,
     textAlignVertical: "top",
   },
   inputError: {
-    borderColor: "#c62828",
+    borderColor: colors.error,
+    borderWidth: borderWidth.thick,
   },
   error: {
-    color: "#c62828",
-    fontSize: 13,
-    marginTop: 4,
+    ...typography.caption,
+    color: colors.error,
+    marginTop: spacing.xs,
   },
 });

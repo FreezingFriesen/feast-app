@@ -1,10 +1,12 @@
+import { DecorativeIcon } from "@/components/DecorativeIcon";
+import { borderWidth, colors, DOT_SIZE, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   addDays,
   dayOfMonth,
   formatDay,
+  formatMonthYear,
   formatWeekday,
-  formatWeekRange,
   weekDays,
   type DateKey,
 } from "../dates";
@@ -14,40 +16,43 @@ type WeekStripProps = {
   selectedKey: DateKey;
   // A day or an arrow was tapped. Gets the newly selected day.
   onSelect: (key: DateKey) => void;
-  // Today's number is coloured blue.
+  // Today's number is green, with a green outline round its card.
   todayKey?: DateKey;
   // Shows a dot under days that have meals planned.
   hasMeals?: (key: DateKey) => boolean;
 };
 
-// ‹ Oct 19 – 25 › with a button for each day of the week containing selectedKey.
+// OCTOBER 2026 ‹ › over a card for each day of the week containing selectedKey,
+// Monday to Sunday, as in the meal planner mockup.
 // The arrows move the selection by one week, keeping the same weekday.
 export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStripProps) {
   return (
     <View style={styles.container}>
-      {/* The top line: previous-week arrow, the week's dates, next-week arrow. */}
+      {/* The top line: the selected day's month, then the previous- and next-week arrows. */}
       <View style={styles.header}>
-        <Pressable
-          onPress={() => onSelect(addDays(selectedKey, -7))}
-          accessibilityRole="button"
-          accessibilityLabel="Previous week"
-          hitSlop={12}
-        >
-          <Text style={styles.arrow}>‹</Text>
-        </Pressable>
-        <Text style={styles.range}>{formatWeekRange(selectedKey)}</Text>
-        <Pressable
-          onPress={() => onSelect(addDays(selectedKey, 7))}
-          accessibilityRole="button"
-          accessibilityLabel="Next week"
-          hitSlop={12}
-        >
-          <Text style={styles.arrow}>›</Text>
-        </Pressable>
+        <Text style={styles.month}>{formatMonthYear(selectedKey)}</Text>
+        <View style={styles.arrows}>
+          <Pressable
+            onPress={() => onSelect(addDays(selectedKey, -7))}
+            accessibilityRole="button"
+            accessibilityLabel="Previous week"
+            style={styles.arrow}
+          >
+            <DecorativeIcon name="chevron-back" size={iconSize.lg} color={colors.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => onSelect(addDays(selectedKey, 7))}
+            accessibilityRole="button"
+            accessibilityLabel="Next week"
+            style={styles.arrow}
+          >
+            <DecorativeIcon name="chevron-forward" size={iconSize.lg} color={colors.text} />
+          </Pressable>
+        </View>
       </View>
 
-      {/* Seven buttons, Monday to Sunday: the weekday, the day number, and a dot if
-          meals are planned. The selected day is filled blue. */}
+      {/* Seven cards, Monday to Sunday: the weekday, the day number, and a dot if meals
+          are planned. The selected day is filled green. */}
       <View style={styles.days}>
         {weekDays(selectedKey).map((key) => {
           const isSelected = key === selectedKey;
@@ -59,7 +64,7 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
               accessibilityRole="button"
               accessibilityLabel={formatDay(key)}
               accessibilityState={{ selected: isSelected }}
-              style={[styles.day, isSelected && styles.daySelected]}
+              style={[styles.day, isToday && styles.dayToday, isSelected && styles.daySelected]}
             >
               <Text style={[styles.weekday, isSelected && styles.textSelected]}>
                 {formatWeekday(key)}
@@ -73,8 +78,8 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
               >
                 {dayOfMonth(key)}
               </Text>
-              {/* The dot is always there (so the buttons stay the same height) but is
-                  only coloured when the day has meals. White on the selected day. */}
+              {/* The dot is always there (so the cards stay the same height) but is
+                  only coloured when the day has meals. Cream on the selected day. */}
               <View
                 style={[
                   styles.dot,
@@ -91,60 +96,73 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
 
 const styles = StyleSheet.create({
   container: {
-    gap: 8,
+    gap: spacing.sm,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 4,
+  },
+  month: {
+    ...typography.sectionLabel,
+    color: colors.text,
+  },
+  arrows: {
+    flexDirection: "row",
   },
   arrow: {
-    fontSize: 28,
-    color: "#208AEF",
-    paddingHorizontal: 8,
-  },
-  range: {
-    fontSize: 17,
-    fontWeight: "600",
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
   },
   days: {
     flexDirection: "row",
-    gap: 4,
+    gap: spacing.xs,
   },
+  // A cream card. The edge is the card's own colour, so the today outline doesn't
+  // change its size.
   day: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 2,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.thick,
+    borderColor: colors.chrome,
+    backgroundColor: colors.chrome,
+    gap: spacing.xxs,
+  },
+  dayToday: {
+    borderColor: colors.action,
   },
   daySelected: {
-    backgroundColor: "#208AEF",
+    backgroundColor: colors.action,
+    borderColor: colors.action,
   },
   weekday: {
-    fontSize: 12,
-    color: "#666",
+    ...typography.small,
+    color: colors.textMuted,
+    textTransform: "uppercase",
   },
   dayNumber: {
-    fontSize: 17,
-    fontWeight: "600",
+    ...typography.number,
+    color: colors.text,
   },
   today: {
-    color: "#208AEF",
+    color: colors.action,
   },
   textSelected: {
-    color: "#fff",
+    color: colors.onAction,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: DOT_SIZE,
+    height: DOT_SIZE,
+    borderRadius: DOT_SIZE / 2,
   },
   dotFilled: {
-    backgroundColor: "#208AEF",
+    backgroundColor: colors.action,
   },
   dotOnSelected: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.onAction,
   },
 });

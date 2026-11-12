@@ -3,7 +3,8 @@ import { StyleSheet, Text } from "react-native";
 import { formatLongDate } from "../accountMessages";
 import { useSessionStatus } from "../SessionStatusProvider";
 import { AccountSection } from "./AccountSection";
-import { TextAction } from "./TextAction";
+import { TextAction } from "@/components/TextAction";
+import { colors, spacing, typography } from "@/theme";
 
 // Session info (N-15) and changing the password.
 export function SecuritySection() {
@@ -25,11 +26,12 @@ export function SecuritySection() {
 
 const styles = StyleSheet.create({
   detail: {
-    fontSize: 16,
-    marginBottom: 4,
+    ...typography.body,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   note: {
-    fontSize: 14,
-    color: "#666",
+    ...typography.caption,
+    color: colors.textMuted,
   },
 });

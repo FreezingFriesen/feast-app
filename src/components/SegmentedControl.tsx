@@ -1,4 +1,5 @@
 import { formatOptionLabel } from "@/components/form/ChipSelect";
+import { colors, MIN_TOUCH_TARGET, radius, shadows, spacing, typography } from "@/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type SegmentedControlProps<T extends string> = {
@@ -43,34 +44,31 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-// A grey track with the selected tab raised in white (shadow on iOS, elevation on Android).
+// A cream track with the selected tab raised in white, its text bold and green.
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    backgroundColor: "#eef0f3",
-    borderRadius: 8,
-    padding: 2,
+    backgroundColor: colors.chrome,
+    borderRadius: radius.md,
+    padding: spacing.xxs,
   },
   segment: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 8,
-    borderRadius: 6,
+    justifyContent: "center",
+    minHeight: MIN_TOUCH_TARGET,
+    borderRadius: radius.sm,
   },
   segmentSelected: {
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    backgroundColor: colors.surface,
+    ...shadows.raised,
   },
   text: {
-    fontSize: 15,
-    color: "#555",
+    ...typography.body,
+    color: colors.textMuted,
   },
   textSelected: {
-    color: "#000",
-    fontWeight: "600",
+    ...typography.bodyStrong,
+    color: colors.action,
   },
 });

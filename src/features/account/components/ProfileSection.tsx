@@ -1,12 +1,13 @@
 import { FormMessage } from "@/components/form/FormMessage";
 import type { Profile } from "@/repositories/ProfileRepository";
 import type { AuthUser } from "@/services/auth/AuthService";
+import { colors, spacing, typography } from "@/theme";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { accountErrorMessage, formatLongDate } from "../accountMessages";
 import { useAccountFlows } from "../useAccountFlows";
 import { AccountSection } from "./AccountSection";
-import { TextAction } from "./TextAction";
+import { TextAction } from "@/components/TextAction";
 
 type ProfileSectionProps = {
   user: AuthUser;
@@ -59,13 +60,13 @@ export function ProfileSection({ user, profile }: ProfileSectionProps) {
 
 const styles = StyleSheet.create({
   username: {
-    fontSize: 22,
-    fontWeight: "600",
-    marginBottom: 4,
+    ...typography.heading,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   detail: {
-    fontSize: 16,
-    color: "#444",
-    marginBottom: 4,
+    ...typography.body,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
   },
 });

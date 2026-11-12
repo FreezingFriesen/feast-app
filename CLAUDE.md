@@ -7,6 +7,7 @@ maintainer after the capstone.
 
 # Project plan and feature list
 @docs/PROJECT_PLAN.md
+@docs/DESIGN_SYSTEM.md
 
 Before starting a task, check the plan for the feature ID (#n or N-nn), the
 decisions already made, and the current sprint. When a feature is finished, tick
@@ -109,6 +110,23 @@ input: `'; DROP TABLE recipes;--`, `<script>alert(1)</script>`, very long string
 empty strings, emoji, invisible characters, and usernames with capitals or spaces.
 Confirm the tables still exist, nothing executes, and invalid input is rejected or
 stored as plain text.
+
+# UI and design system
+- Before changing any UI, read `docs/DESIGN_SYSTEM.md` and the tokens in
+  `src/theme/`, and start from them.
+- No raw colour, font-size or spacing literals outside `src/theme/` (lint rejects
+  colour literals). Use semantic roles (`colors.action`, `colors.textMuted`), not
+  brand swatches.
+- Orange (`#E98814`) is a fill and illustration colour only: never text, and never
+  with light text on it. Yellow (`#FFE567`) goes only on green or behind dark text.
+  Brand green is never an "allergen-safe" signal.
+- Need a new colour or role? Add it to `src/theme/colors.ts`, `docs/DESIGN_SYSTEM.md`
+  and `contrastPairs` in the same change, and say if it isn't from Alex's palette.
+- The mockups are in `docs/design/mockups/`. Match them, but if a mockup shows
+  something with no feature behind it, don't fake it: add it to the "Not implemented"
+  list in the design doc.
+- UI changes must keep validation, route-param checks, accessibility labels and
+  roles, 44pt touch targets, offline start and the performance budget.
 
 # Working style
 - Keep changes small and explain which feature ID they relate to.

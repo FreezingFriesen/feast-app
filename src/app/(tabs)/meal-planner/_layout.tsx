@@ -1,10 +1,13 @@
+import { stackHeader } from "@/components/AppHeader";
+import { modalScreenOptions, stackScreenOptions } from "@/theme";
 import { Stack } from "expo-router";
 
 // This layout is shared across all the routes defined in the /meal-planner directory.
-// The planner is the main screen. The other three open on top of it.
+// The planner is the main screen, with the Feast header (AppHeader). The other three
+// open on top of it.
 export default function MealPlannerLayout() {
   return (
-    <Stack>
+    <Stack screenOptions={{ ...stackScreenOptions, header: stackHeader }}>
       <Stack.Screen name="index" options={{ title: "Meal Planner" }} />
       {/* The day popup opened from the month view. Android form sheets have no
           native header, so the screen draws its own title. */}
@@ -20,9 +23,10 @@ export default function MealPlannerLayout() {
         }}
       />
       {/* Choosing a recipe for a slot, and editing a planned meal, open as popups
-          (modals) on top of the planner, each with its own header. */}
-      <Stack.Screen name="pick-recipe" options={{ presentation: "modal", title: "Add recipe" }} />
-      <Stack.Screen name="entry/[id]" options={{ presentation: "modal", title: "Edit meal" }} />
+          (modals) on top of the planner. They keep the phone's own header, in the
+          Feast colours (see modalScreenOptions). */}
+      <Stack.Screen name="pick-recipe" options={{ ...modalScreenOptions, title: "Add recipe" }} />
+      <Stack.Screen name="entry/[id]" options={{ ...modalScreenOptions, title: "Edit meal" }} />
     </Stack>
   );
 }

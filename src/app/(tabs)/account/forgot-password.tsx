@@ -11,6 +11,7 @@ import {
   PASSWORD_RESET_SENT,
 } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
+import { colors, spacing, typography } from "@/theme";
 import { AlreadySignedIn } from "@/features/account/components/AlreadySignedIn";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
 import { useAuthUser } from "@/features/account/useAuthUser";
@@ -107,8 +108,8 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
   intro: {
-    fontSize: 16,
-    color: "#444",
-    marginBottom: 16,
+    ...typography.body,
+    color: colors.textMuted,
+    marginBottom: spacing.lg,
   },
 });

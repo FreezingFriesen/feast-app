@@ -1,5 +1,6 @@
 // The popup for one day, opened by tapping a day in the month view.
 // Shows the day's Breakfast, Lunch and Dinner slots.
+import { HeaderTextButton } from "@/components/HeaderTextButton";
 import { PlaceholderScreen } from "@/components/PlaceholderScreen";
 import { DaySlots } from "@/features/meal-planner/components/DaySlots";
 import { formatDay, type DateKey } from "@/features/meal-planner/dates";
@@ -7,9 +8,10 @@ import { emptyDaySlots, groupByDay } from "@/features/meal-planner/groupEntries"
 import { useMealPlanEntries } from "@/features/meal-planner/useMealPlanEntries";
 import { usePlannerNavigation } from "@/features/meal-planner/usePlannerNavigation";
 import { useRecipesById } from "@/features/recipes/useRecipes";
+import { colors, spacing, typography } from "@/theme";
 import { dateKeySchema } from "@/validation/mealPlanSchema";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 // The date comes from the link that opened this screen (/meal-planner/day/2026-11-03).
 // If it isn't a real "YYYY-MM-DD" date, show a "not found" message instead.
@@ -37,10 +39,10 @@ function DayPlan({ date }: { date: DateKey }) {
       {/* This popup has no header bar (see _layout.tsx), so it draws its own title
           and a Done button that closes it. */}
       <View style={styles.header}>
-        <Text style={styles.title}>{formatDay(date)}</Text>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={8}>
-          <Text style={styles.done}>Done</Text>
-        </Pressable>
+        <Text style={styles.title} accessibilityRole="header">
+          {formatDay(date)}
+        </Text>
+        <HeaderTextButton label="Done" onPress={() => router.back()} />
       </View>
       {/* "Add" opens the recipe picker for that slot; tapping a meal opens it for editing. */}
       <DaySlots
@@ -55,10 +57,10 @@ function DayPlan({ date }: { date: DateKey }) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingTop: 24,
-    paddingBottom: 48,
-    gap: 16,
+    padding: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
   },
   header: {
     flexDirection: "row",
@@ -66,12 +68,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   title: {
-    fontSize: 22,
-    fontWeight: "600",
-  },
-  done: {
-    color: "#208AEF",
-    fontSize: 16,
-    fontWeight: "600",
+    ...typography.heading,
+    color: colors.text,
   },
 });

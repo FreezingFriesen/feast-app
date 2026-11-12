@@ -1,4 +1,7 @@
+import { borderWidth, colors, CONTROL_HEIGHT, radius, spacing, typography } from "@/theme";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+
+type Variant = "primary" | "secondary" | "destructive";
 
 type SubmitButtonProps = {
   label: string;
@@ -7,11 +10,12 @@ type SubmitButtonProps = {
   busy?: boolean;
   disabled?: boolean;
   // destructive: for actions that can't be undone, like deleting an account.
-  variant?: "primary" | "secondary" | "destructive";
+  variant?: Variant;
   onPress: () => void;
 };
 
-// A form's main action, in the same style as the recipe form's save button.
+// A form's main action. primary is filled green, secondary is outlined green, and
+// destructive is red (kept apart from the brand colours on purpose).
 // Disabled while busy so it can't be pressed twice.
 export function SubmitButton({
   label,
@@ -22,8 +26,9 @@ export function SubmitButton({
   onPress,
 }: SubmitButtonProps) {
   const inactive = busy || disabled;
-  const secondary = variant === "secondary";
+  const textColor = TEXT_COLORS[variant];
   // The button can't be pressed while busy or disabled, and fades out to show that.
+  // It darkens while pressed.
   return (
     <Pressable
       onPress={onPress}
@@ -31,37 +36,37 @@ export function SubmitButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy }}
-      style={[
+      style={({ pressed }) => [
         styles.button,
-        secondary && styles.secondary,
-        variant === "destructive" && styles.destructive,
+        buttonStyles[variant],
+        pressed && pressedStyles[variant],
         inactive && styles.inactive,
       ]}
     >
       {/* While busy: a spinner, and busyLabel (e.g. "Logging in…") instead of the label. */}
       <View style={styles.content}>
-        {busy ? <ActivityIndicator color={secondary ? "#208AEF" : "#fff"} /> : null}
-        <Text style={[styles.text, secondary && styles.secondaryText]}>{busy && busyLabel ? busyLabel : label}</Text>
+        {busy ? <ActivityIndicator color={textColor} /> : null}
+        <Text style={[styles.text, { color: textColor }]}>{busy && busyLabel ? busyLabel : label}</Text>
       </View>
     </Pressable>
   );
 }
 
+const TEXT_COLORS: Record<Variant, string> = {
+  primary: colors.onAction,
+  secondary: colors.action,
+  destructive: colors.onDestructive,
+};
+
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: "#208AEF",
-    borderRadius: 8,
-    paddingVertical: 14,
+    minHeight: CONTROL_HEIGHT,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     alignItems: "center",
-    marginTop: 16,
-  },
-  secondary: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#208AEF",
-  },
-  destructive: {
-    backgroundColor: "#c62828",
+    justifyContent: "center",
+    marginTop: spacing.lg,
   },
   inactive: {
     opacity: 0.6,
@@ -69,14 +74,25 @@ const styles = StyleSheet.create({
   content: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
   text: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    ...typography.button,
   },
-  secondaryText: {
-    color: "#208AEF",
+});
+
+const buttonStyles = StyleSheet.create({
+  primary: { backgroundColor: colors.action },
+  secondary: {
+    backgroundColor: colors.surface,
+    borderWidth: borderWidth.thick,
+    borderColor: colors.action,
   },
+  destructive: { backgroundColor: colors.error },
+});
+
+const pressedStyles = StyleSheet.create({
+  primary: { backgroundColor: colors.actionPressed },
+  secondary: { backgroundColor: colors.selectedTint },
+  destructive: { backgroundColor: colors.errorText },
 });

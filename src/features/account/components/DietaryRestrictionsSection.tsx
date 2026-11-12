@@ -3,6 +3,7 @@ import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import type { Profile } from "@/repositories/ProfileRepository";
 import { useProfileRepository } from "@/repositories/RepositoryProvider";
+import { colors, spacing, typography } from "@/theme";
 import { dietaryRestrictionsSchema } from "@/validation/profileSchema";
 import { ALLERGENS, DIET_TAGS } from "@/validation/recipeSchema";
 import { useState } from "react";
@@ -108,18 +109,19 @@ export function DietaryRestrictionsSection({ profile }: { profile: Profile }) {
 
 const styles = StyleSheet.create({
   summary: {
-    fontSize: 16,
-    marginBottom: 4,
+    ...typography.body,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   note: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 8,
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
   },
   groupTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginTop: 12,
-    marginBottom: 8,
+    ...typography.bodyStrong,
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 });

@@ -1,10 +1,15 @@
 // The Recipes tab: a list of the user's saved recipes (#1, N-01).
+import { EmptyState } from "@/components/EmptyState";
+import { SubmitButton } from "@/components/form/SubmitButton";
+import { HeaderTextButton } from "@/components/HeaderTextButton";
 import { useRecipes } from "@/features/recipes/useRecipes";
-import { Link, Stack } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { borderWidth, colors, radius, spacing, typography } from "@/theme";
+import { Link, Stack, useRouter } from "expo-router";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 
 // This screen displays a list of recipes and allows the user to navigate to the "New Recipe" screen.
 export default function RecipesScreen() {
+  const router = useRouter();
   // All saved recipes, newest first. The list updates by itself when a recipe is added.
   const recipes = useRecipes();
 
@@ -12,14 +17,12 @@ export default function RecipesScreen() {
   return (
     <>
       {/* Add a header button to navigate to the "New Recipe" screen. */}
-      {/* asChild makes the Pressable inside behave as the link, so it keeps its own look. */}
+      {/* asChild makes the button inside behave as the link, so it keeps its own look. */}
       <Stack.Screen
         options={{
           headerRight: () => (
             <Link href="/recipes/new" asChild>
-              <Pressable accessibilityRole="button" accessibilityLabel="New recipe" hitSlop={8}>
-                <Text style={styles.headerButton}>+ New</Text>
-              </Pressable>
+              <HeaderTextButton label="+ New" accessibilityLabel="New recipe" />
             </Link>
           ),
         }}
@@ -34,15 +37,10 @@ export default function RecipesScreen() {
         contentContainerStyle={recipes.length === 0 ? styles.emptyContainer : styles.list}
         // Shown instead of the list when there are no recipes.
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No recipes yet</Text>
-            <Text style={styles.emptyDescription}>Your saved recipes will appear here.</Text>
-            <Link href="/recipes/new" asChild>
-              <Pressable accessibilityRole="button" style={styles.button}>
-                <Text style={styles.buttonText}>Create a recipe</Text>
-              </Pressable>
-            </Link>
-          </View>
+          <EmptyState icon="book-outline" title="No recipes yet" description="Your saved recipes will appear here.">
+            {/* navigate is what a Link does, so this behaves like the link it replaces. */}
+            <SubmitButton label="Create a recipe" onPress={() => router.navigate("/recipes/new")} />
+          </EmptyState>
         }
         // Render each recipe item in the list with its title, number of servings, and number of ingredients.
         renderItem={({ item }) => (
@@ -58,62 +56,30 @@ export default function RecipesScreen() {
   );
 }
 
-// Define styles for the components in the RecipesScreen.
+// White cards with a thin edge, as in the mockups. No shadows on list rows, so
+// scrolling stays fast.
 const styles = StyleSheet.create({
-  headerButton: {
-    color: "#208AEF",
-    fontSize: 16,
-    fontWeight: "600",
-    paddingHorizontal: 8,
-  },
   list: {
-    padding: 16,
-    gap: 8,
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   emptyContainer: {
     flexGrow: 1,
   },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: "#208AEF",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
   item: {
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: "#fff",
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
   },
   itemTitle: {
-    fontSize: 17,
-    fontWeight: "600",
+    ...typography.itemTitle,
+    color: colors.text,
   },
   itemMeta: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 2,
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.xxs,
   },
 });

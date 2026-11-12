@@ -1,41 +1,58 @@
-import type { Profile } from "@/repositories/ProfileRepository";
-import type { AuthUser } from "@/services/auth/AuthService";
-import { StyleSheet, View } from "react-native";
-import { DeleteAccountSection } from "./DeleteAccountSection";
-import { DietaryRestrictionsSection } from "./DietaryRestrictionsSection";
+import { colors, spacing, typography } from "@/theme";
+import { useRouter } from "expo-router";
+import { StyleSheet, Text, View } from "react-native";
+import { AccountMenuRow } from "./AccountMenuRow";
 import { LogOutButton } from "./LogOutButton";
-import { ProfileSection } from "./ProfileSection";
-import { SecuritySection } from "./SecuritySection";
 import { SyncSection } from "./SyncSection";
 
-type SignedInAccountProps = {
-  user: AuthUser;
-  profile: Profile;
-};
-
-// The Account page for a signed-in user, built from one component per section.
-// Top to bottom: profile, dietary restrictions, sync, security, log out, then
-// delete account on its own at the bottom.
-export function SignedInAccount({ user, profile }: SignedInAccountProps) {
+// The Account page for a signed-in user, as in the mockup: a menu of the Account
+// screens, then sync status and log out. Top to bottom:
+// - Account & Settings: Account Details (profile, sign-in and security, delete account)
+// - Food Preferences: Allergies & Diets (dietary restrictions, N-18)
+// - Sync (stays here, so "Offline" and "N changes waiting" show on the Account page)
+// - Log out
+export function SignedInAccount() {
+  const router = useRouter();
   return (
     <View style={styles.container}>
-      <ProfileSection user={user} profile={profile} />
-      <DietaryRestrictionsSection profile={profile} />
-      <SyncSection />
-      <SecuritySection />
-      <LogOutButton />
+      <Text style={styles.group} accessibilityRole="header">
+        Account & Settings
+      </Text>
+      <AccountMenuRow
+        icon="person-outline"
+        title="Account Details"
+        caption="Manage"
+        onPress={() => router.push("/account/details")}
+      />
+
+      <Text style={styles.group} accessibilityRole="header">
+        Food Preferences
+      </Text>
+      <AccountMenuRow
+        icon="nutrition-outline"
+        title="Allergies & Diets"
+        caption="Manage"
+        onPress={() => router.push("/account/dietary")}
+      />
+
       <View style={styles.spacer} />
-      <DeleteAccountSection />
+      <SyncSection />
+      <LogOutButton />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    padding: spacing.lg,
   },
-  // Keeps the destructive section apart from the everyday actions.
+  group: {
+    ...typography.groupHeading,
+    color: colors.action,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
+  },
   spacer: {
-    height: 32,
+    height: spacing.xl,
   },
 });

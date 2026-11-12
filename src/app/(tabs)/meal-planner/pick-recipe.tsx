@@ -1,7 +1,9 @@
 // Choose a recipe to add to one meal slot (date + Breakfast/Lunch/Dinner).
 // Recipes tagged with the slot's meal type are listed first.
+import { EmptyState } from "@/components/EmptyState";
 import { formatOptionLabel } from "@/components/form/ChipSelect";
 import { FieldError } from "@/components/form/FormField";
+import { SubmitButton } from "@/components/form/SubmitButton";
 import { PlaceholderScreen } from "@/components/PlaceholderScreen";
 import { formatServings } from "@/features/meal-planner/components/DaySlots";
 import { formatDay, type DateKey } from "@/features/meal-planner/dates";
@@ -9,10 +11,11 @@ import { writeErrorMessage } from "@/features/meal-planner/writeErrorMessage";
 import { useRecipes } from "@/features/recipes/useRecipes";
 import type { Recipe } from "@/repositories/RecipeRepository";
 import { useMealPlanRepository } from "@/repositories/RepositoryProvider";
+import { borderWidth, colors, radius, spacing, typography } from "@/theme";
 import { plannerSlotParamsSchema, type PlannerMealType } from "@/validation/mealPlanSchema";
-import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { Pressable, SectionList, StyleSheet, Text } from "react-native";
 
 // The date and meal type come from the link that opened this screen. If either one
 // isn't valid, show a "not found" message instead of the picker.
@@ -83,15 +86,14 @@ function RecipePicker({ date, mealType }: { date: DateKey; mealType: PlannerMeal
         ListHeaderComponent={error ? <FieldError message={error} /> : null}
         // Shown when the user has no recipes at all.
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No recipes yet</Text>
-            <Text style={styles.emptyDescription}>Create a recipe, then add it to your plan.</Text>
-            <Link href="/recipes/new" asChild>
-              <Pressable accessibilityRole="button" style={styles.button}>
-                <Text style={styles.buttonText}>Create a recipe</Text>
-              </Pressable>
-            </Link>
-          </View>
+          <EmptyState
+            icon="book-outline"
+            title="No recipes yet"
+            description="Create a recipe, then add it to your plan."
+          >
+            {/* navigate is what a Link does, so this behaves like the link it replaces. */}
+            <SubmitButton label="Create a recipe" onPress={() => router.navigate("/recipes/new")} />
+          </EmptyState>
         }
         renderSectionHeader={({ section }) => (
           <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -113,65 +115,37 @@ function RecipePicker({ date, mealType }: { date: DateKey; mealType: PlannerMeal
   );
 }
 
+// White cards with a thin edge, under small capital headings.
 const styles = StyleSheet.create({
   list: {
-    padding: 16,
-    gap: 8,
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   emptyContainer: {
     flexGrow: 1,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-    textTransform: "uppercase",
-    marginTop: 8,
+    ...typography.sectionLabel,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
   },
   item: {
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: "#fff",
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
   },
   itemDisabled: {
     opacity: 0.6,
   },
   itemTitle: {
-    fontSize: 17,
-    fontWeight: "600",
+    ...typography.itemTitle,
+    color: colors.text,
   },
   itemMeta: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 2,
-  },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: "#208AEF",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.xxs,
   },
 });

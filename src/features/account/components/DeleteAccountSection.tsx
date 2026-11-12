@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
 import { StyleSheet, Text } from "react-native";
 import { AccountSection } from "./AccountSection";
-import { TextAction } from "./TextAction";
+import { TextAction } from "@/components/TextAction";
+import { colors, typography } from "@/theme";
 
 // The way into deleting the account (N-17). The steps are on their own screen.
 // A short warning, and a red link that opens the delete-account screen.
@@ -17,7 +18,7 @@ export function DeleteAccountSection() {
 
 const styles = StyleSheet.create({
   note: {
-    fontSize: 14,
-    color: "#666",
+    ...typography.caption,
+    color: colors.textMuted,
   },
 });

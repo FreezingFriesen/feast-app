@@ -5,6 +5,7 @@ import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { accountErrorMessage, accountFieldMessage, offlineMessage } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
+import { colors, spacing, typography } from "@/theme";
 import { UsernameField } from "@/features/account/components/UsernameField";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
 import { useAuthUser } from "@/features/account/useAuthUser";
@@ -87,8 +88,8 @@ export default function ChooseUsernameScreen() {
 
 const styles = StyleSheet.create({
   intro: {
-    fontSize: 16,
-    color: "#444",
-    marginBottom: 16,
+    ...typography.body,
+    color: colors.textMuted,
+    marginBottom: spacing.lg,
   },
 });

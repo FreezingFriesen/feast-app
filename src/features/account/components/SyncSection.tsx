@@ -1,6 +1,7 @@
 import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { useSyncService } from "@/services/ServiceProvider";
+import { colors, spacing, typography } from "@/theme";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { canSyncNow, syncSummary } from "../syncMessages";
@@ -48,15 +49,15 @@ export function SyncSection() {
 
 const styles = StyleSheet.create({
   headline: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
+    ...typography.bodyStrong,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   error: {
-    color: "#c62828",
+    color: colors.error,
   },
   detail: {
-    fontSize: 15,
-    color: "#444",
+    ...typography.body,
+    color: colors.textMuted,
   },
 });

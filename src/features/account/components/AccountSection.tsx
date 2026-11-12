@@ -1,3 +1,4 @@
+import { borderWidth, colors, radius, spacing, typography } from "@/theme";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -7,7 +8,7 @@ type AccountSectionProps = {
   children: ReactNode;
 };
 
-// One titled card on the Account page (same card style as the recipe form).
+// One titled card on the Account pages: a white card with a green heading.
 export function AccountSection({ title, children }: AccountSectionProps) {
   // The title is marked as a heading, so screen reader users can jump between sections.
   return (
@@ -22,15 +23,16 @@ export function AccountSection({ title, children }: AccountSectionProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.surface,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
+    ...typography.groupHeading,
+    color: colors.action,
+    marginBottom: spacing.sm,
   },
 });

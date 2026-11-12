@@ -85,8 +85,9 @@ the in-memory fake (the default) or real Firebase Auth and Firestore. Done so fa
 validation, interfaces, domain errors, the 30-day session, chunked secure token
 storage, the SQLite profile cache and the composition root, plus:
 - signed-out screens: log in, sign up, forgot password, choose username
-- signed-in page: profile, dietary restrictions, sync status, session info,
-  change password, log out
+- signed-in page: a menu with Account Details (profile, session info, change
+  password, delete account) and Allergies & Diets (dietary restrictions), plus the
+  sync status card and log out
 - delete account: re-authenticate, typed username, retry-safe deletion
 - Firebase services, proven on the emulators by the same contract suite as the fake
   (`npm run test:backend`)
@@ -111,6 +112,15 @@ the Firebase project is connected" in Open items). Account tab phases:
 
 ### Offline
 - [ ] N-20 Stored recipes, meal planning and grocery list generation all work fully offline
+
+### UI / visual identity
+- [ ] N-21 Apply the Feast brand UI to every screen (proposed ID, no backlog story yet)
+
+Status: the design system is in `src/theme/` and `docs/DESIGN_SYSTEM.md`, and every
+existing screen follows it and the mockups in `docs/design/mockups/`. Not ticked until
+a person checks it on a phone (the header, sheets, modals, keyboard, large text and the
+welcome gradient), and the splash and app icon on a preview build, since Expo Go doesn't
+show them.
 
 ## Later (post-MVP)
 - Recipe import from outside the app: social media, email, photos of physical
@@ -215,6 +225,18 @@ the Firebase project is connected" in Open items). Account tab phases:
   expo-sqlite's web worker. `metro.config.js` adds `.wasm` as an asset type for the
   same worker. Try `static` again after an Expo upgrade if static web pages are ever
   needed.
+- **Theme (N-21):** the design system lives in `src/theme/` (colour roles, contrast,
+  typography, layout, navigation options) and is explained in `docs/DESIGN_SYSTEM.md`.
+  - Colour literals outside `src/theme/` fail lint (`no-restricted-syntax` in
+    `eslint.config.js`).
+  - `contrast.test.ts` checks every colour pair the app draws; `appConfig.test.ts`
+    keeps `app.json`'s colours equal to the tokens.
+  - **Light only** (`userInterfaceStyle: "light"`): no mockup is dark and nothing
+    handles dark mode.
+  - White screens with cream chrome, as in the mockups, and the system font until Alex
+    confirms the brand fonts.
+  - Headers are our own `AppHeader` (rounded cream bar), except the two modals, which
+    keep the native header.
 - **Login by email**; username is a unique display name stored in a `usernames`
   collection.
 - **Nutrition/price data:** API key stays server-side. A script or Cloud Function
@@ -441,6 +463,18 @@ To be planned.
   drops it from downloads. Add it to both when the allergen computation is built. `source` in the data model isn't in `recipeSchema`
   either, so the Rules refuse it until recipe import is built (the ingredient row's
   `rawText` isn't in `ingredientRowSchema`, and rows aren't checked by the Rules).
+- Design questions for Alex (N-21; the full list is in `docs/DESIGN_SYSTEM.md`):
+  - Is cream `#FFF2E9` official? Are ink `#1F1F1F` and error red `#C62828` OK?
+  - Which fonts do the mockups use, and what are their licences?
+  - Where do Logo_variation and Icon_variation go? Can we have black and white
+    wordmark exports?
+  - The meal-slot colours.
+  - Button label cream or white.
+  - A licensed photo for the welcome screen.
+- The mockups show things with no feature behind them yet (recipe photos, a recipe
+  detail screen, difficulty, ingredient swaps, social login, Explore). They're listed
+  under "Not implemented" in `docs/DESIGN_SYSTEM.md`. Recipe photos and difficulty
+  would be data model changes.
 - Plan Sprints 2 and 3; confirm how the rubric's hours-per-person applies to a
   one-week Sprint 1.
 - Stakeholder communication plan for Sprint 1 (missing from the plan template).

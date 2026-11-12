@@ -1,46 +1,63 @@
+import { DecorativeIcon, type IconName } from "@/components/DecorativeIcon";
+import { borderWidth, colors, iconSize, radius, spacing, typography } from "@/theme";
 import { StyleSheet, Text, View } from "react-native";
 
+type Tone = "error" | "info" | "success";
+
 type FormMessageProps = {
-  // error = red, info = blue, success = green.
-  tone: "error" | "info" | "success";
+  // error = red, info = yellow, success = green. Each also has its own icon, so the
+  // tone isn't shown by colour alone.
+  tone: Tone;
   message: string;
 };
 
 // A message above or below a form. Screen readers announce it when it appears.
 // Errors are marked as alerts so they are read out straight away.
 export function FormMessage({ tone, message }: FormMessageProps) {
+  const look = TONES[tone];
   return (
     <View
-      style={[styles.box, boxStyles[tone]]}
+      style={[styles.box, look.box]}
       accessibilityRole={tone === "error" ? "alert" : undefined}
       accessibilityLiveRegion="polite"
     >
-      <Text style={[styles.text, textStyles[tone]]}>{message}</Text>
+      <DecorativeIcon name={look.icon} size={iconSize.md} color={look.color} />
+      <Text style={[styles.text, { color: look.color }]}>{message}</Text>
     </View>
   );
 }
 
+// The icon, edge, background and text colour for each tone.
+const TONES: Record<Tone, { icon: IconName; color: string; box: { borderColor: string; backgroundColor: string } }> = {
+  error: {
+    icon: "alert-circle-outline",
+    color: colors.errorText,
+    box: { borderColor: colors.error, backgroundColor: colors.errorBackground },
+  },
+  info: {
+    icon: "information-circle-outline",
+    color: colors.text,
+    box: { borderColor: colors.info, backgroundColor: colors.infoBackground },
+  },
+  success: {
+    icon: "checkmark-circle-outline",
+    color: colors.success,
+    box: { borderColor: colors.success, backgroundColor: colors.successBackground },
+  },
+};
+
 const styles = StyleSheet.create({
   box: {
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 12,
-    marginVertical: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.thin,
+    padding: spacing.md,
+    marginVertical: spacing.sm,
   },
   text: {
-    fontSize: 15,
+    ...typography.body,
+    flex: 1,
   },
-});
-
-// The border, background and text colours for each tone.
-const boxStyles = StyleSheet.create({
-  error: { borderColor: "#c62828", backgroundColor: "#fdecea" },
-  info: { borderColor: "#208AEF", backgroundColor: "#e8f3fd" },
-  success: { borderColor: "#2e7d32", backgroundColor: "#e8f5e9" },
-});
-
-const textStyles = StyleSheet.create({
-  error: { color: "#8e1c1c" },
-  info: { color: "#0b4f8a" },
-  success: { color: "#1b5e20" },
 });

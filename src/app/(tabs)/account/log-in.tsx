@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/form/SubmitButton";
 import { accountErrorMessage, accountFieldMessage, offlineMessage } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
 import { AlreadySignedIn } from "@/features/account/components/AlreadySignedIn";
-import { TextAction } from "@/features/account/components/TextAction";
+import { TextAction } from "@/components/TextAction";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
 import { useAuthUser } from "@/features/account/useAuthUser";
 import { useOnline } from "@/features/account/useOnline";

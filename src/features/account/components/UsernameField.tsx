@@ -1,4 +1,5 @@
 import { FormField } from "@/components/form/FormField";
+import { colors, spacing, typography } from "@/theme";
 import { MAX_USERNAME_LENGTH } from "@/validation/authSchema";
 import { StyleSheet, Text, View } from "react-native";
 import { usernameCheckMessage } from "../accountMessages";
@@ -45,14 +46,14 @@ export function UsernameField({ value, onChangeText, error, editable }: Username
 // The negative margin pulls the hint up under the box, into the field's bottom spacing.
 const styles = StyleSheet.create({
   status: {
-    fontSize: 13,
-    marginTop: -8,
-    marginBottom: 12,
+    ...typography.caption,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
   },
 });
 
 const toneStyles = StyleSheet.create({
-  muted: { color: "#666" },
-  success: { color: "#2e7d32" },
-  error: { color: "#c62828" },
+  muted: { color: colors.textMuted },
+  success: { color: colors.success },
+  error: { color: colors.error },
 });
