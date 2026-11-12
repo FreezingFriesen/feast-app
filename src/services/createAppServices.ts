@@ -1,5 +1,7 @@
 // The composition root: the only place that picks implementations.
+import { emptyIngredientCatalog } from "@/repositories/IngredientCatalog";
 import type { Repositories } from "@/repositories/RepositoryProvider";
+import { createSqliteGroceryRepository } from "@/repositories/sqliteGroceryRepository";
 import { createSqliteMealPlanRepository } from "@/repositories/sqliteMealPlanRepository";
 import { createSqliteProfileRepository } from "@/repositories/sqliteProfileRepository";
 import { createSqliteRecipeRepository } from "@/repositories/sqliteRecipeRepository";
@@ -115,12 +117,18 @@ export function createAppServices({
   now = Date.now,
   latencyMs = 0,
 }: AppServicesOptions): AppServices {
-  // Local data stays real whichever backend is chosen: recipes, the meal plan and the
-  // profile all live in the phone's SQLite database (#1), even with the in-memory backend.
+  // Local data stays real whichever backend is chosen: recipes, the meal plan, the
+  // profile and the grocery list state all live in the phone's SQLite database (#1), even
+  // with the in-memory backend.
   const repositories: Repositories = {
     recipes: createSqliteRecipeRepository(database, now),
     mealPlans: createSqliteMealPlanRepository(database, now),
     profiles: createSqliteProfileRepository(database, now),
+    groceries: createSqliteGroceryRepository(database, now),
+    // Empty until the ingredient catalog is built (a separate task): nothing reads the
+    // ingredients collection yet, so the grocery list matches rows by name and lists rows
+    // that need conversion data separately. Only this line changes when it exists.
+    ingredientCatalog: emptyIngredientCatalog,
   };
 
   // The 30-day session: where the login date is kept, and the rule that checks it. Built
@@ -146,7 +154,13 @@ export function createAppServices({
     now,
   });
   // Clears everything this phone keeps for the user (log out, account deletion).
-  const localData = createLocalDataWiper([repositories.profiles, repositories.recipes, repositories.mealPlans, syncMeta]);
+  const localData = createLocalDataWiper([
+    repositories.profiles,
+    repositories.recipes,
+    repositories.mealPlans,
+    repositories.groceries,
+    syncMeta,
+  ]);
 
   return {
     services: {

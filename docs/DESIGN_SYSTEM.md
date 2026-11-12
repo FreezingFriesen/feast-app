@@ -223,6 +223,19 @@ Feature components follow the same tokens:
 - Recipe list rows (`recipes/index`): border-only cards with a trailing edit button
   (green pencil, 44pt, labelled "Edit <title>"). Only the button opens the editor;
   tapping the row itself is kept for the detail screen.
+- `features/grocery/components/WeekSelector`: 44pt previous and next chevrons in `text`
+  (faded and disabled at the planner's date limits), the week's dates as a `heading`,
+  "This week" as a muted caption, and a "Back to this week" `TextAction` once the user
+  has moved away.
+- `features/grocery/components/GroceryRow`: a whole-row checkbox (`accessibilityRole`
+  "checkbox" with `checked` state, labelled with the name and the amount in words). An
+  `inputBorder` square becomes a green ticked box when checked, so state isn't shown by
+  colour alone. Checked text is muted and struck through. An optional muted caption, an
+  optional 44pt remove button (manual items), and a decorative divider under each row
+  (no shadows).
+- `features/grocery/components/AddGroceryItemForm`: "+ Add item" opens an inline form
+  (name, optional amount on a decimal keyboard, one unit chip, "Add to list"). It stays
+  open for adding several, and "Done" closes it.
 
 ## Navigation chrome
 - **Header:**
@@ -264,7 +277,7 @@ Feature components follow the same tokens:
 | `(tabs)/meal-planner/day/[date]` | none (brand defaults) | Done | #4, #17 |
 | `(tabs)/meal-planner/pick-recipe` | none (brand defaults) | Done | N-05 |
 | `(tabs)/meal-planner/entry/[id]` | none (stepper style from 04) | Done | N-05 |
-| `(tabs)/grocery-list` | `01-grocery-list-filled.png` | Placeholder: chrome matches, the list isn't built | #6, N-07 to N-11 |
+| `(tabs)/grocery-list` | `01-grocery-list-filled.png` (not in the repo yet) | Done from this system: week selector, list with checkboxes, "Added by you", inline add form; no cost or aisles | #6, N-07, N-09, N-10 |
 | `(tabs)/account/index` (signed out) | `05-welcome-signed-out.png` | Done, without social login or the photo | N-13, N-14 |
 | `(tabs)/account/index` (signed in) | `03-account-signed-in.png` | Done, real rows only | N-15 to N-19, #19 |
 | `(tabs)/account/details` | from 03 | Done (profile, security, delete) | N-15, N-17 |
@@ -287,7 +300,7 @@ ticked only after a person checks the screens on a phone.
 
 | Item | Mockup | Depends on |
 |---|---|---|
-| Grocery items, quantities, checkboxes, "+ Add Ingredient" | 01 | #6, N-07 to N-11 |
+| Grocery list cost, grouping by store aisle or category | 01 | N-11 (price data), ingredient data |
 | Explore tab (recipe library) | all | Later (post-MVP) |
 | Recipe photos | 02, 04 | No image field (data model, validation, Rules, storage) |
 | Recipe detail screen, "View recipe" | 02, 04 | N-01 |

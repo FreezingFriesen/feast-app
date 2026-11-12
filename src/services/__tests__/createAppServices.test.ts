@@ -115,6 +115,27 @@ describe("createAppServices with the in-memory backend", () => {
     expect(await restarted.repositories.mealPlans.getById(added.entry.id)).toBeUndefined();
   });
 
+  it("keeps grocery check marks and added items in SQLite: they survive a restart, and the wipe clears them", async () => {
+    const first = await setup("memory");
+    const week = "2026-11-09";
+    expect(await first.repositories.groceries.setChecked(week, "name:flour|mass", true)).toEqual({ ok: true });
+    const added = await first.repositories.groceries.addManualItem(week, { name: "Paper towels" });
+    if (!added.ok) throw new Error(added.reason);
+
+    const restarted = await setup("memory", first.database);
+    expect(await restarted.repositories.groceries.listCheckedKeys(week)).toEqual(["name:flour|mass"]);
+    expect(await restarted.repositories.groceries.listManualItems(week)).toEqual([added.item]);
+
+    await restarted.services.localData.wipe();
+    expect(await restarted.repositories.groceries.listCheckedKeys(week)).toEqual([]);
+    expect(await restarted.repositories.groceries.listManualItems(week)).toEqual([]);
+  });
+
+  it("wires an empty ingredient catalog until the real one exists", async () => {
+    const { repositories } = await setup("memory");
+    expect(repositories.ingredientCatalog.find({ name: "Flour" })).toBeUndefined();
+  });
+
   it("never loads the Firebase SDK or reads the Firebase values", async () => {
     await setup("memory");
     expect((globalThis as { firebaseSdkLoaded?: boolean }).firebaseSdkLoaded).toBeUndefined();

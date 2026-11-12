@@ -6,8 +6,8 @@
 import { z } from "zod";
 import { cleanText } from "./clean";
 import { dateKeySchema } from "./mealPlanSchema";
-import { ID_PATTERN, NAME_PATTERN } from "./patterns";
-import { ALLERGENS, DIET_TAGS } from "./recipeSchema";
+import { ID_PATTERN } from "./patterns";
+import { ALLERGENS, DIET_TAGS, safeName } from "./recipeSchema";
 
 // Constants for allowed values in the ingredient schema
 export const INGREDIENT_CATEGORIES = [
@@ -27,16 +27,18 @@ export const PACKAGE_UNITS = ["g", "kg", "ml", "l", "lb", "each"] as const;
 export const CURRENCIES = ["CAD"] as const;
 export const REGIONS = ["Alberta"] as const;
 
+// Unit conversion limits, shared by ingredientSchema and catalogMatchSchema.
+export const MAX_GRAMS_PER_CUP = 1000;
+export const MAX_GRAMS_PER_PIECE = 5000;
+
 // The earliest allowed priceCollectedAt date.
 export const MIN_PRICE_DATE = "2020-01-01";
 // Sugar plus fibre may be above carbs by this much before it is reported (rounding).
 export const CARB_SLACK_G = 1.5;
 
 // Helper functions for ingredient schema validation
-// name: short names with the character allowlist. freeText: cleaned, length only.
-const name = (max: number) =>
-  z.string().transform(cleanText).pipe(z.string().min(1).max(max).regex(NAME_PATTERN));
-
+// Short names use safeName from recipeSchema (the character allowlist).
+// freeText: cleaned, length only.
 const freeText = (max: number) =>
   z.string().transform(cleanText).pipe(z.string().min(1).max(max));
 
@@ -51,13 +53,13 @@ export const ingredientSchema = z
   .object({
     // Identity. id becomes the document ID (ingredients/all_purpose_flour), not a field.
     id: z.string().max(100).regex(ID_PATTERN),
-    name: name(100),
-    aliases: z.array(name(50)).max(10).default([]),
+    name: safeName(100),
+    aliases: z.array(safeName(50)).max(10).default([]),
     category: z.enum(INGREDIENT_CATEGORIES),
 
     // Unit conversion. Often blank: the app must say "can't convert", never guess.
-    gramsPerCup: positive(1000).optional(),
-    gramsPerPiece: positive(5000).optional(),
+    gramsPerCup: positive(MAX_GRAMS_PER_CUP).optional(),
+    gramsPerPiece: positive(MAX_GRAMS_PER_PIECE).optional(),
     pieceDescription: freeText(100).optional(),
 
     // Price
@@ -67,7 +69,7 @@ export const ingredientSchema = z
     ),
     packageSize: positive(100_000),
     packageUnit: z.enum(PACKAGE_UNITS),
-    priceSource: name(50),
+    priceSource: safeName(50),
     priceCollectedAt: dateKeySchema
       .refine((date) => date >= MIN_PRICE_DATE, "Before 2020")
       .refine((date) => date <= todayKey(), "In the future"),
@@ -83,7 +85,7 @@ export const ingredientSchema = z
     fiberG: amount(100),
     sugarG: amount(100),
     sodiumMg: amount(40_000),
-    nutritionSource: name(100),
+    nutritionSource: safeName(100),
 
     // Safety tags (N-03, N-04). Lists shared with recipes and profiles.
     allergens: z.array(z.enum(ALLERGENS)).max(ALLERGENS.length).default([]),
@@ -131,3 +133,14 @@ export function ingredientWarnings(ingredient: Ingredient): string[] {
   }
   return warnings;
 }
+
+// What an ingredient catalog hands the grocery list for one recipe row: the ingredient's
+// ID and its conversion data. The catalog's data comes from outside the app (Edwin's
+// import, later a cache of Firestore), so the grocery list checks every match with this
+// before using it, with the same limits as ingredientSchema. A match that fails reads as
+// no match, so a bad density can never turn into a wrong amount.
+export const catalogMatchSchema = z.object({
+  id: z.string().max(100).regex(ID_PATTERN),
+  gramsPerCup: positive(MAX_GRAMS_PER_CUP).optional(),
+  gramsPerPiece: positive(MAX_GRAMS_PER_PIECE).optional(),
+});

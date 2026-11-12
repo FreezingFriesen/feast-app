@@ -70,6 +70,28 @@ export const MIGRATIONS: readonly string[] = [
   );
   PRAGMA user_version = 4;
   COMMIT;`,
+  // 5: the user's own grocery list state (N-10), local only and never synced: check marks
+  // on generated lines (a row means checked) and items added by hand. The generated list
+  // itself is worked out from the meal plan and never stored.
+  `BEGIN;
+  CREATE TABLE grocery_checks (
+    week_start TEXT NOT NULL,
+    item_key TEXT NOT NULL,
+    PRIMARY KEY (week_start, item_key)
+  );
+  CREATE TABLE grocery_manual_items (
+    id TEXT PRIMARY KEY NOT NULL,
+    week_start TEXT NOT NULL,
+    name TEXT NOT NULL,
+    quantity REAL,
+    unit TEXT,
+    checked INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    schema_version INTEGER NOT NULL
+  );
+  CREATE INDEX grocery_manual_items_week ON grocery_manual_items (week_start);
+  PRAGMA user_version = 5;
+  COMMIT;`,
 ];
 
 // Brings the database up to the latest version. Safe to run on every app start.

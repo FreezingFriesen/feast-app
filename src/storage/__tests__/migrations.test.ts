@@ -22,9 +22,17 @@ describe("migrations", () => {
     const db = createNodeSqliteDatabase();
     await runMigrations(db);
     expect(version(db)).toBe(MIGRATIONS.length);
-    expect(MIGRATIONS).toHaveLength(4);
-    expect(names(db, "table")).toEqual(["meal_plan_entries", "profiles", "recipes", "sync_meta"]);
+    expect(MIGRATIONS).toHaveLength(5);
+    expect(names(db, "table")).toEqual([
+      "grocery_checks",
+      "grocery_manual_items",
+      "meal_plan_entries",
+      "profiles",
+      "recipes",
+      "sync_meta",
+    ]);
     expect(names(db, "index")).toEqual([
+      "grocery_manual_items_week",
       "meal_plan_entries_dirty",
       "meal_plan_entries_slot",
       "recipes_dirty",
@@ -42,6 +50,33 @@ describe("migrations", () => {
     expect(version(db)).toBe(MIGRATIONS.length);
     expect(Object.values(db.raw.prepare("SELECT * FROM profiles").get() as object)).toEqual(PROFILE_ROW);
     expect(names(db, "table")).toContain("recipes");
+  });
+
+  it("upgrades a version-4 database to add the grocery tables without losing its meal plan", async () => {
+    const db = createNodeSqliteDatabase();
+    for (const migration of MIGRATIONS.slice(0, 4)) db.raw.exec(migration);
+    db.raw
+      .prepare(
+        "INSERT INTO meal_plan_entries (id, date, meal_type, recipe_id, servings, created_at, updated_at, schema_version) VALUES ('e', '2026-11-09', 'dinner', 'r', 4, 1, 1, 1)",
+      )
+      .run();
+    expect(version(db)).toBe(4);
+
+    await runMigrations(db);
+    expect(version(db)).toBe(5);
+    expect(db.raw.prepare("SELECT id, servings FROM meal_plan_entries").all()).toEqual([{ id: "e", servings: 4 }]);
+    expect(names(db, "table")).toEqual(expect.arrayContaining(["grocery_checks", "grocery_manual_items"]));
+  });
+
+  it("new grocery items start unchecked unless they say otherwise", async () => {
+    const db = createNodeSqliteDatabase();
+    await runMigrations(db);
+    db.raw
+      .prepare(
+        "INSERT INTO grocery_manual_items (id, week_start, name, created_at, schema_version) VALUES ('i', '2026-11-09', 'Milk', 1, 1)",
+      )
+      .run();
+    expect(db.raw.prepare("SELECT checked FROM grocery_manual_items").get()).toEqual({ checked: 0 });
   });
 
   it("can run again on every start without changing anything", async () => {
@@ -69,7 +104,9 @@ describe("migrations", () => {
     const db = createNodeSqliteDatabase();
     await runMigrations(db);
     // A table a new migration would create already exists, so that migration fails.
-    db.raw.exec("PRAGMA user_version = 1; DROP TABLE meal_plan_entries; DROP TABLE sync_meta;");
+    db.raw.exec(
+      "PRAGMA user_version = 1; DROP TABLE meal_plan_entries; DROP TABLE sync_meta; DROP TABLE grocery_checks; DROP TABLE grocery_manual_items;",
+    );
     await expect(runMigrations(db)).rejects.toThrow();
     expect(version(db)).toBe(1);
     expect(names(db, "table")).toEqual(["profiles", "recipes"]);

@@ -31,13 +31,14 @@ export const MEAL_TYPES = ["breakfast","lunch","dinner","snack"] as const;
 export const ALLERGENS = ["peanuts","tree_nuts","milk","eggs","fish","shellfish","sesame","soy","wheat","mustard","sulphites"] as const;
 
 // Helpers: clean the text first (remove control/invisible characters, trim),
-// then check the length rules.
+// then check the length rules. Shared by the other schema files (ingredients, grocery
+// items), so every name follows the same allowlist.
 // safeText = free text (descriptions, steps, notes)
 // safeName = short names (titles, ingredient names) with the character allowlist
-const safeText = (min: number, max: number) =>
+export const safeText = (min: number, max: number) =>
   z.string().transform(cleanText).pipe(z.string().min(min).max(max));
 
-const safeName = (max: number) =>
+export const safeName = (max: number) =>
   z.string().transform(cleanText).pipe(z.string().min(1).max(max).regex(NAME_PATTERN));
 
 // Removes duplicates and sorts into vocabulary order, so the same choices are

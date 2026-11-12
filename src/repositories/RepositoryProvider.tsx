@@ -1,4 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type { GroceryRepository } from "./GroceryRepository";
+import { emptyIngredientCatalog, type IngredientCatalog } from "./IngredientCatalog";
+import { createInMemoryGroceryRepository } from "./inMemoryGroceryRepository";
 import { createInMemoryMealPlanRepository } from "./inMemoryMealPlanRepository";
 import { createInMemoryProfileRepository } from "./inMemoryProfileRepository";
 import { createInMemoryRecipeRepository } from "./inMemoryRecipeRepository";
@@ -11,6 +14,10 @@ export type Repositories = {
   recipes: RecipeRepository;
   mealPlans: MealPlanRepository;
   profiles: ProfileRepository;
+  // The user's grocery list state: check marks and items added by hand (N-10).
+  groceries: GroceryRepository;
+  // Ingredient reference data for merging and converting grocery amounts (N-08).
+  ingredientCatalog: IngredientCatalog;
 };
 
 // Shares the repositories with every screen inside RepositoryProvider.
@@ -33,6 +40,8 @@ export function RepositoryProvider({ children, repositories }: RepositoryProvide
         recipes: createInMemoryRecipeRepository(),
         mealPlans: createInMemoryMealPlanRepository(),
         profiles: createInMemoryProfileRepository(),
+        groceries: createInMemoryGroceryRepository(),
+        ingredientCatalog: emptyIngredientCatalog,
       },
   );
   return <RepositoryContext.Provider value={value}>{children}</RepositoryContext.Provider>;
@@ -58,4 +67,12 @@ export function useMealPlanRepository(): MealPlanRepository {
 
 export function useProfileRepository(): ProfileRepository {
   return useRepositories().profiles;
+}
+
+export function useGroceryRepository(): GroceryRepository {
+  return useRepositories().groceries;
+}
+
+export function useIngredientCatalog(): IngredientCatalog {
+  return useRepositories().ingredientCatalog;
 }

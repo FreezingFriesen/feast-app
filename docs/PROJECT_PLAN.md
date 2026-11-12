@@ -61,13 +61,35 @@ Status: Month/Week planner UI, assign/move/remove and servings are built
 N-06 is waiting on ingredient price data.
 
 ### Grocery lists
-- [ ] #6 Generate a weekly grocery list from the meal plan
+- [x] #6 Generate a weekly grocery list from the meal plan
 - [ ] #18 Grocery list usable offline
-- [ ] N-07 Merge duplicate ingredients across recipes
+- [x] N-07 Merge duplicate ingredients across recipes
 - [ ] N-08 Combine units (cups vs grams) using ingredient density data
-- [ ] N-09 Scale quantities from serving-size changes (#8)
-- [ ] N-10 Check off items and add manual items
+- [x] N-09 Scale quantities from serving-size changes (#8)
+- [x] N-10 Check off items and add manual items
 - [ ] N-11 Estimated cost shown on the grocery list
+
+Status: the Grocery tab builds a list for a chosen week (this week by default, with
+previous and next arrows) from the meal plan, on the phone, with no network:
+- **#6, N-09:** each ingredient row is scaled to the planned meal's servings
+  (`quantity × entry servings / recipe servings`). A meal whose recipe was deleted adds
+  nothing, and the screen says how many were left out.
+- **N-07:** rows for the same ingredient are merged by `ingredientId`, else by name
+  (cleaned, lower-cased, spaces collapsed). "Egg" and "Eggs" stay separate.
+- **N-10:** lines can be checked off (checked lines sink to the bottom), and items can be
+  added by hand in a separate "Added by you" section. Both are stored per week in SQLite
+  (migration 5), on this phone only.
+- **N-08 (not ticked):** units in one family always combine (`1 cup + 250 ml = 500 ml`).
+  Combining across families (cups with grams, pieces with grams) is built and tested
+  through `IngredientCatalog`, but the app wires an empty catalog until the ingredient
+  data is read on the phone, so today those rows stay separate lines marked "can't
+  combine without conversion data". Never a guessed total.
+- **#18 (not ticked):** everything runs on local data, but nobody has checked it in
+  airplane mode on a phone yet.
+- **N-11 (not ticked):** waits on price data.
+
+Not built: cost, nutrition, grouping by aisle, sharing or exporting the list, custom date
+ranges, syncing check marks and added items.
 
 ### Nutrition
 - [ ] #3 Track nutrition / calorie intake
@@ -181,10 +203,11 @@ show them.
   `code`, not a subclass. Screens never see Firebase error codes.
 - **Local database:** `expo-sqlite` (`feast.db`). The schema lives in
   `src/storage/migrations.ts` as numbered, constant SQL migrations: 1 `profiles`,
-  2 `recipes`, 3 `meal_plan_entries` (#1), 4 `sync_meta` (N-19). Lists are stored as JSON text, length-capped
+  2 `recipes`, 3 `meal_plan_entries` (#1), 4 `sync_meta` (N-19), 5 `grocery_checks` and
+  `grocery_manual_items` (N-10, local only). Lists are stored as JSON text, length-capped
   before parsing, and every row read back is validated with the stored-record schemas
-  (`storedRecipeSchema`, `storedMealPlanEntrySchema`); a row that fails reads as missing.
-  The same repositories are used with both backends.
+  (`storedRecipeSchema`, `storedMealPlanEntrySchema`, `storedManualGroceryItemSchema`); a
+  row that fails reads as missing. The same repositories are used with both backends.
 - **Sync hooks:** recipes and meal plan entries have a `dirty` column
   (1 = changed on this phone and not uploaded). Both repositories add `Syncable`
   (`src/repositories/Syncable.ts`): `listPending(limit, after?)` (dirty records, deleted
@@ -244,6 +267,26 @@ show them.
     keep the native header.
 - **Login by email**; username is a unique display name stored in a `usernames`
   collection.
+- **Grocery list (#6, N-07 to N-10):** derived, never stored. The engine is pure
+  functions in `src/features/grocery/`:
+  - `generateGroceryList` takes the week's entries, recipes by ID and an injected
+    `IngredientCatalog` (`src/repositories/IngredientCatalog.ts`).
+  - Amounts are added at full precision in a base unit (g, ml, piece, pinch) and rounded
+    only for display (2 decimal places; a positive amount never shows as 0, it shows
+    "< 0.01").
+  - Units: every constant is in `units.ts`. **The cup is 250 ml** (Canadian metric; 15 ml
+    tbsp, 5 ml tsp), so Edwin's `gramsPerCup` must use a 250 ml cup (to confirm with
+    him).
+  - Which unit a line shows: if every row shares a unit it's kept (`2 lb + 1 lb = 3 lb`).
+    Mixed units in a family show g or ml, switching to kg or l at 1000. A cross-family
+    merge shows mass. Rows that can't be converted stay separate lines, marked.
+  - A line's key is its group key (`id:…` or `name:…`) plus its unit family, so a check
+    mark stays when the amount changes.
+  - The catalog is wired empty in `createAppServices` until the ingredient data is read
+    on the phone. Every match is re-checked with `catalogMatchSchema`.
+  - `GroceryRepository` (in-memory and SQLite, same contract) caps each week at 100
+    added items and 10,500 check marks (the most lines a week can have). Inputs are
+    checked with `src/validation/groceryItemSchema.ts`, and the week must be a Monday.
 - **Nutrition/price data:** API key stays server-side. A script or Cloud Function
   pulls from the API, validates, and writes to Firestore. The app only reads
   Firestore and caches it.
@@ -370,6 +413,25 @@ To be planned.
   - Removing a recipe doesn't remove the meal plan entries that use it. They show as
     "Recipe unavailable" and can still be removed. A download can also bring an entry
     before its recipe, which looks the same until the recipe arrives.
+- Known limits of the grocery list (#6, N-10):
+  - Check marks and added items are stored on the phone only and aren't synced. A new
+    phone rebuilds the list from the synced recipes and meal plans, but starts with no
+    check marks or added items. Log out and account deletion wipe them, and the log out
+    prompt doesn't mention it yet (it only mentions recipes and meal plans).
+  - Until the ingredient catalog exists, rows are matched by name or `ingredientId` only,
+    and rows in different unit families (cups and grams, pieces and grams) are listed
+    separately.
+  - No plural matching: "Egg" and "Eggs" are two lines until the catalog matches them.
+  - The 250 ml cup is a choice (Canadian metric). A US cup is about 237 ml, so a recipe
+    written in US cups is off by about 5% when combined with millilitres.
+  - A check mark belongs to a line's key. If the key changes (a future catalog matches a
+    row by ID, or a merge changes the line's unit family), that line shows as unchecked.
+    Check marks for lines that are no longer on the list stay stored (up to the cap) and
+    come back if the line returns that week.
+  - `ingredientRowSchema` doesn't check `ingredientId` against the ID pattern, so the list
+    ignores an `ingredientId` that isn't a valid ID and matches that row by name.
+  - A decimal comma ("1,5") in the amount box is refused as "Enter a number", the same as
+    in the recipe form.
 - The Account page says recipes are filtered by dietary restrictions by default
   (N-04), but that filter isn't built yet.
 - Re-authenticating (e.g. to change password) doesn't restart the 30-day session

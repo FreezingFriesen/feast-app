@@ -1,4 +1,4 @@
-import { ingredientSchema, ingredientWarnings } from "../ingredientSchema";
+import { catalogMatchSchema, ingredientSchema, ingredientWarnings } from "../ingredientSchema";
 
 // The egg row from Edwin's dataset, with its allergen corrected to the shared list.
 const valid = {
@@ -173,5 +173,32 @@ describe("ingredientWarnings", () => {
 
   it("warns when sugar + fibre is well above carbs", () => {
     expect(ingredientWarnings(parsed({ carbsG: 2, sugarG: 2, fiberG: 2 }))).toHaveLength(1);
+  });
+});
+
+describe("catalogMatchSchema (what a catalog hands the grocery list)", () => {
+  it("accepts an ID with or without conversion data", () => {
+    expect(catalogMatchSchema.parse({ id: "all_purpose_flour", gramsPerCup: 125 })).toEqual({
+      id: "all_purpose_flour",
+      gramsPerCup: 125,
+    });
+    expect(catalogMatchSchema.parse({ id: "egg_whole_raw", gramsPerPiece: 50, name: "Egg" })).toEqual({
+      id: "egg_whole_raw",
+      gramsPerPiece: 50,
+    });
+  });
+
+  it.each([
+    { id: "Bad ID" },
+    { id: "../x" },
+    { id: "" },
+    { id: "a".repeat(101) },
+    { id: "flour", gramsPerCup: 0 },
+    { id: "flour", gramsPerCup: 1001 },
+    { id: "flour", gramsPerCup: Number.NaN },
+    { id: "flour", gramsPerPiece: 5001 },
+    { id: "flour", gramsPerPiece: -1 },
+  ])("rejects %p", (match) => {
+    expect(catalogMatchSchema.safeParse(match).success).toBe(false);
   });
 });
