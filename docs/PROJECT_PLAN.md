@@ -149,6 +149,19 @@ a person checks it on a phone (the header, sheets, modals, keyboard, large text 
 welcome gradient), and the splash and app icon on a preview build, since Expo Go doesn't
 show them.
 
+### Demo (tradeshow)
+- [ ] N-22 Tradeshow demo build: guests install the real app from a QR code (proposed
+  ID, no backlog story yet)
+
+Status: the build config is in the repo, and the steps are in `docs/DEMO_BUILD.md`:
+- `app.json` has the permanent ID `ca.feastapp.feast` on both platforms.
+- `eas.json` has a `demo` profile: an Android APK, and iOS for TestFlight.
+- `buildConfig.test.ts` guards both.
+
+Guests sign up with their own accounts on a separate demo Firebase project, deleted after
+the show; there is no shared demo account. Not ticked until the APK and the TestFlight
+build have been installed and checked on real phones against the demo project.
+
 ## Later (post-MVP)
 - Recipe import from outside the app: social media, email, photos of physical
   recipes (was #12). Imported content is untrusted and must be validated.
@@ -299,6 +312,19 @@ show them.
   ignored. A missing `allergens_reviewed` column means false.
 - **Dev build later:** after the capstone, switch to React Native Firebase and an
   EAS development build; add payments.
+- **Demo build (N-22):** a standalone release build of the same Expo Go-compatible code
+  (no development build, no new native libraries). Steps in `docs/DEMO_BUILD.md`.
+  - `eas.json` profile `demo`. Android is `internal` + `apk` (direct install). iOS is
+    `store`, for a TestFlight public link: an internal iOS build only installs on
+    registered devices.
+  - The backend is chosen in `eas.json` (`EXPO_PUBLIC_BACKEND=firebase`, since release
+    builds refuse `memory`). The six Firebase values for a separate demo project live
+    only in the EAS `preview` environment, never in the repo. `buildConfig.test.ts`
+    fails if `eas.json` holds any other build variable.
+  - Build numbers are kept by EAS (`appVersionSource: "remote"`, `autoIncrement`), so
+    `app.json` has no `buildNumber` or `versionCode`.
+  - `usesNonExemptEncryption: false` (HTTPS only). `expo-secure-store` runs with
+    `faceIDPermission: false`, because the app doesn't use biometrics.
 
 ## Data model (draft)
 ```
@@ -546,6 +572,20 @@ To be planned.
   one-week Sprint 1.
 - Stakeholder communication plan for Sprint 1 (missing from the plan template).
 - Decide which phones the team tests on (iOS, Android, or both).
+- Tradeshow demo build (N-22), all in `docs/DEMO_BUILD.md`:
+  - Before the first build: Expo Doctor reports seven Expo packages one patch release
+    behind SDK 57 (`expo`, `expo-constants`, `expo-glass-effect`, `expo-linking`,
+    `expo-router`, `expo-splash-screen`, `expo-sqlite`). Run `npx expo install --fix`,
+    then the checks.
+  - The demo build is the first time the app runs against a real Firebase project on a
+    phone. Do the Android build and the phone checks early, before the iOS review.
+  - Guests enter emails and allergies. The booth sign and the TestFlight description
+    must say what is collected and that it's deleted after the show. Apple may ask for
+    this as a privacy policy URL.
+  - After the show: delete the demo Firebase project, expire the TestFlight build and
+    stop sharing the APK link.
+  - The EAS `preview` environment holds the demo backend. A real preview build later
+    needs its own environment.
 - Upgrade to Expo SDK 58. It fixes the `decode-uri-component` advisory in
   expo-router's deep-link parsing (moderate DoS, ships in the app). Everyone on
   the team needs an Expo Go that supports SDK 58. It also adds `usePreventRemove`

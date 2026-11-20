@@ -8,7 +8,15 @@
     "scheme": "feastapp",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FFFFFF",
+    "ios": {
+      "bundleIdentifier": "ca.feastapp.feast",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
     "android": {
+      "package": "ca.feastapp.feast",
       "adaptiveIcon": {
         "backgroundColor": "#09693F",
         "foregroundImage": "./assets/brand/adaptive-icon-foreground.png",
@@ -30,7 +38,12 @@
           "imageWidth": 260
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-sqlite"
     ],
     "experiments": {
