@@ -1,0 +1,11 @@
+id,name,aliases,category,grams_per_cup,grams_per_piece,piece_description,package_price,package_size,package_unit,price_source,price_collected_at,currency,region,calories_per_100g,protein_g,carbs_g,fat_g,saturated_fat_g,fiber_g,sugar_g,sodium_mg,nutrition_source,allergens,allergens_reviewed,diet_tags,last_updated,notes
+all_purpose_flour,All-purpose flour,flour;white flour,pantry,125,,,4.99,2500,g,Sample Store,2026-10-13,CAD,Alberta,364,10.3,76.3,1,0.2,2.7,0.3,2,Sample Nutrition Data,wheat,FALSE,vegan;vegetarian,2026-10-13,
+butter_salted,"Butter, salted",butter,dairy_eggs,227,454,1 brick (454 g),6.49,454,g,Sample Store,2026-10-13,CAD,Alberta,717,0.9,0.1,81.1,51.4,0,0.1,643,Sample Nutrition Data,milk,FALSE,vegetarian,2026-10-13,
+egg_whole_raw,"Egg, whole, raw",eggs;large egg,dairy_eggs,,50,"1 large egg, shelled",4.23,12,each,Sample Store,2026-10-13,CAD,Alberta,142.9,12.5,1.7,10.7,2.7,0,0,125,Sample Nutrition Data,eggs,TRUE,vegetarian,2026-10-13,
+milk_whole,Whole milk,milk;homogenized milk,dairy_eggs,258,,,5.99,4,l,Sample Store,2026-10-13,CAD,Alberta,61,3.2,4.8,3.3,1.9,0,5,43,Sample Nutrition Data,milk,FALSE,vegetarian,2026-10-13,
+oil_canola,Canola oil,vegetable oil,oils_sauces,218,,,7.49,1.89,l,Sample Store,2026-10-13,CAD,Alberta,884,0,0,100,7.4,0,0,0,Sample Nutrition Data,,FALSE,vegan;vegetarian,2026-10-13,
+onion_yellow,Yellow onion,onion,produce,160,110,1 medium onion,3.49,3,lb,Sample Store,2026-10-13,CAD,Alberta,40,1.1,9.3,0.1,0,1.7,4.2,4,Sample Nutrition Data,,FALSE,vegan;vegetarian,2026-10-13,
+peanut_butter,Peanut butter,smooth peanut butter,pantry,258,,,5.79,1000,g,Sample Store,2026-10-13,CAD,Alberta,588,25,20,50,10,6,9,426,Sample Nutrition Data,peanuts,TRUE,vegan;vegetarian,2026-10-13,
+rice_white,White rice,rice;long grain rice,pantry,195,,,8.99,4000,g,Sample Store,2026-10-13,CAD,Alberta,365,7.1,80,0.7,0.2,1.3,0.1,5,Sample Nutrition Data,,FALSE,vegan;vegetarian,2026-10-13,
+soy_sauce,Soy sauce,,oils_sauces,255,,,3.99,500,ml,Sample Store,2026-10-13,CAD,Alberta,53,8.1,4.9,0.6,0.1,0.8,0.4,5493,Sample Nutrition Data,soy;wheat,FALSE,vegan;vegetarian,2026-10-13,
+sugar_white,White sugar,sugar;granulated sugar,pantry,200,,,3.29,2000,g,Sample Store,2026-10-13,CAD,Alberta,387,0,100,0,0,0,99.8,1,Sample Nutrition Data,,FALSE,vegan;vegetarian,2026-10-13,Sample row: not from Edwin's data.

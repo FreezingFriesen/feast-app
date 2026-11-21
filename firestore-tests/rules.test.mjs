@@ -12,9 +12,14 @@ import {
   collection,
   deleteDoc,
   doc,
+  documentId,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
+  query,
   setDoc,
+  startAfter,
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
@@ -714,6 +719,18 @@ describe("ingredients", () => {
   it("denies signed-out users", async () => {
     await seed("ingredients/all_purpose_flour", { name: "All-purpose flour" });
     await assertFails(getDoc(doc(signedOut(), "ingredients/all_purpose_flour")));
+  });
+
+  it("denies signed-out users listing them", async () => {
+    await seed("ingredients/all_purpose_flour", { name: "All-purpose flour" });
+    await assertFails(getDocs(collection(signedOut(), "ingredients")));
+  });
+
+  it("allows signed-in users to page through them by ID, as the app does", async () => {
+    await seed("ingredients/all_purpose_flour", { name: "All-purpose flour" });
+    await seed("ingredients/butter", { name: "Butter" });
+    const page = query(collection(asUser("alice"), "ingredients"), orderBy(documentId()), startAfter("all_purpose_flour"), limit(500));
+    await assertSucceeds(getDocs(page));
   });
 
   it("denies writes from the app", async () => {

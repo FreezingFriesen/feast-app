@@ -3,6 +3,7 @@
 // and nothing reads the Firebase variables.
 import { createFirebaseAuthService } from "@/services/auth/firebaseAuthService";
 import type { ConnectivityService } from "@/services/connectivity/ConnectivityService";
+import { createFirebaseRemoteIngredientSource } from "@/services/ingredients/firebaseRemoteIngredientSource";
 import { createFirebaseRemoteProfileStore } from "@/services/profiles/firebaseRemoteProfileStore";
 import type { ChunkedSecureStorage } from "@/services/session/chunkedSecureStorage";
 import { createFirebaseRemoteContentStore } from "@/services/userData/firebaseRemoteContentStore";
@@ -26,5 +27,7 @@ export function createFirebaseRemote({ authStorage, connectivity, now }: Firebas
     remoteContent: createFirebaseRemoteUserContent({ client, connectivity }),
     // The same shared client, so sync writes as the signed-in user.
     remoteStore: createFirebaseRemoteContentStore({ client, connectivity }),
+    // Reads the shared ingredients collection as the signed-in user (the Rules need one).
+    ingredientSource: createFirebaseRemoteIngredientSource({ client, connectivity }),
   };
 }

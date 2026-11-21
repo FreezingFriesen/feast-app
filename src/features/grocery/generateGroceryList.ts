@@ -5,7 +5,7 @@
 import type { CatalogMatch, IngredientCatalog } from "@/repositories/IngredientCatalog";
 import type { MealPlanEntry } from "@/repositories/MealPlanRepository";
 import type { Recipe } from "@/repositories/RecipeRepository";
-import { cleanText } from "@/validation/clean";
+import { normaliseName } from "@/validation/clean";
 import { catalogMatchSchema } from "@/validation/ingredientSchema";
 import { ID_PATTERN } from "@/validation/patterns";
 import { baseToGrams, metricDisplay, toBase, unitFamily, type Density, type Unit, type UnitFamily } from "./units";
@@ -57,12 +57,9 @@ const FAMILY_ORDER: readonly UnitFamily[] = ["mass", "volume", "piece", "pinch"]
 // Lines are sorted by name, ignoring case and accents ("Flour" next to "flour").
 const byName = new Intl.Collator("en", { sensitivity: "base" });
 
-// A name as a merge key: cleaned, lower-cased, runs of spaces made one. No guessing about
-// plurals: "Egg" and "Eggs" stay apart until the catalog matches them, because a wrong
-// merge is worse than a missed one.
-export function normaliseName(name: string): string {
-  return cleanText(name).toLowerCase().replace(/\s+/g, " ");
-}
+// A name as a merge key (cleaned, lower-cased, spaces collapsed). It lives in
+// src/validation/clean.ts so the ingredient catalog matches names the same way.
+export { normaliseName };
 
 // The catalog's match for a row, checked like any data from outside the app. A match that
 // fails the check is ignored, so a bad density can never produce a wrong amount.

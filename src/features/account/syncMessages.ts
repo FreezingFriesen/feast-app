@@ -16,6 +16,13 @@ export function formatSyncTime(timestamp: number): string {
   });
 }
 
+// The line about the ingredient data on this phone (N-08), e.g. "Ingredient data: updated
+// Nov 19". Month and day in the user's locale.
+export function ingredientDataLine(fetchedAt: number): string {
+  const date = new Date(fetchedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `Ingredient data: updated ${date}`;
+}
+
 // What the sync section says (#19, N-19). Display only; the status comes from the sync engine.
 export function syncSummary(status: SyncStatus, online: boolean | null): SyncSummary {
   if (status.restore) {

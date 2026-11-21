@@ -80,10 +80,15 @@ previous and next arrows) from the meal plan, on the phone, with no network:
   added by hand in a separate "Added by you" section. Both are stored per week in SQLite
   (migration 5), on this phone only.
 - **N-08 (not ticked):** units in one family always combine (`1 cup + 250 ml = 500 ml`).
-  Combining across families (cups with grams, pieces with grams) is built and tested
-  through `IngredientCatalog`, but the app wires an empty catalog until the ingredient
-  data is read on the phone, so today those rows stay separate lines marked "can't
-  combine without conversion data". Never a guessed total.
+  Combining across families (cups with grams, pieces with grams) uses the ingredient
+  catalog: the copy of Firestore's `ingredients` downloaded to the phone (see "Ingredient
+  catalog" in Technical decisions). A row matched by `ingredientId` or its exact name or
+  alias combines wherever that ingredient has `gramsPerCup` or `gramsPerPiece`. Rows with
+  no match, or no conversion data, stay separate lines marked "can't combine without
+  conversion data". Never a guessed total. Before the first download (a phone that has
+  never been signed in online), the catalog is empty and nothing crosses families. Not
+  ticked until the phone check: sign in on the `firebase` backend, sync, airplane mode,
+  restart, and `1 cup flour + 100 g flour` is still one line.
 - **#18 (not ticked):** everything runs on local data, but nobody has checked it in
   airplane mode on a phone yet.
 - **N-11 (not ticked):** waits on price data.
@@ -208,7 +213,8 @@ build have been installed and checked on real phones against the demo project.
   transaction, not a queued write: it goes straight to the server, and the SDK retries it
   at most 5 times.
 - **Guardrails:** lint refuses the Firebase SDK outside `src/services/firebase/`, the
-  five `firebase*.ts` services, `src/testing/` and `firestore-tests/`, and `firebase-admin`
+  six `firebase*.ts` services (the sixth is `firebaseRemoteIngredientSource.ts`),
+  `src/testing/` and `firestore-tests/`, and `firebase-admin`
   outside `scripts/`. A test fails if an `EXPO_PUBLIC_` name appears beyond the seven
   in `.env.example`.
 - **Domain errors:** expected failures are typed results. Anything an implementation
@@ -217,7 +223,8 @@ build have been installed and checked on real phones against the demo project.
 - **Local database:** `expo-sqlite` (`feast.db`). The schema lives in
   `src/storage/migrations.ts` as numbered, constant SQL migrations: 1 `profiles`,
   2 `recipes`, 3 `meal_plan_entries` (#1), 4 `sync_meta` (N-19), 5 `grocery_checks` and
-  `grocery_manual_items` (N-10, local only). Lists are stored as JSON text, length-capped
+  `grocery_manual_items` (N-10, local only), 6 `ingredients` and `ingredient_meta` (N-08,
+  the ingredient catalog's copy). Lists are stored as JSON text, length-capped
   before parsing, and every row read back is validated with the stored-record schemas
   (`storedRecipeSchema`, `storedMealPlanEntrySchema`, `storedManualGroceryItemSchema`); a
   row that fails reads as missing. The same repositories are used with both backends.
@@ -295,8 +302,9 @@ build have been installed and checked on real phones against the demo project.
     merge shows mass. Rows that can't be converted stay separate lines, marked.
   - A line's key is its group key (`id:…` or `name:…`) plus its unit family, so a check
     mark stays when the amount changes.
-  - The catalog is wired empty in `createAppServices` until the ingredient data is read
-    on the phone. Every match is re-checked with `catalogMatchSchema`.
+  - The catalog is the phone's copy of the ingredient data (see "Ingredient catalog"
+    below), read through `useIngredientCatalog()`. Every match is re-checked with
+    `catalogMatchSchema`.
   - `GroceryRepository` (in-memory and SQLite, same contract) caps each week at 100
     added items and 10,500 check marks (the most lines a week can have). Inputs are
     checked with `src/validation/groceryItemSchema.ts`, and the week must be a Monday.
@@ -309,7 +317,53 @@ build have been installed and checked on real phones against the demo project.
   `GOOGLE_APPLICATION_CREDENTIALS`. Exactly three known spellings are corrected first
   (`lbs`, `tree nuts`, `peanut`), and each fix is printed; `ingredientSchema` stays strict
   and rejects them if given them directly. Columns the schema doesn't have are named and
-  ignored. A missing `allergens_reviewed` column means false.
+  ignored. A missing `allergens_reviewed` column means false. The report also lists every
+  name or alias that belongs to more than one ingredient (the app matches those to none
+  of them), so the data can be fixed; it never changes them.
+- **Ingredient catalog (N-08, and the allergen data for #10, N-03, N-04):** the app keeps
+  a validated copy of Firestore's `ingredients` in SQLite and serves it through
+  `IngredientCatalog`, offline and signed out included.
+  - **Pieces:** `RemoteIngredientSource` (`src/services/ingredients/`: Firebase and
+    in-memory, one contract suite, also on the emulators against data written by the real
+    import command); `IngredientRepository` (SQLite and in-memory, one contract suite);
+    `IngredientCatalogStore` (what `Repositories` holds; `useIngredientCatalog()` reads it
+    with `useSyncExternalStore`); `createIngredientRefresh` (the download). The in-memory
+    backend serves a 10-row made-up list (`sampleIngredients.ts`, identical to
+    `scripts/__fixtures__/ingredients-catalog.csv`).
+  - **When it downloads:** at app start, after sign in and when the connection comes back,
+    if signed in, online and the copy is over 24 hours old (or missing, or dated in the
+    future); and on "Sync now", forced. One run at a time. It is separate from the sync
+    engine: a read-only snapshot of shared data, not the user's content.
+  - **How:** pages of 500 ordered by document ID, at most 10 pages and 2,000 documents.
+    Each document's ID must match the ID pattern, and the document is validated with
+    `storedIngredientSchema` (the ID set last, so a body can't claim another). Repeated IDs
+    count as skipped.
+  - **Swap rule (fail closed):** the copy is replaced only when the download finished,
+    at least one document is valid and no more than 10% were skipped. Otherwise the old
+    copy stays. A bad or partial download never wipes a good copy.
+  - **Atomic swap without a transaction:** `SqlDatabase` has no transaction call, and
+    expo-sqlite's `withTransactionAsync` isn't exclusive (another repository's write at the
+    same moment would run inside it and be undone by a rollback). So rows carry a
+    `generation`. A new copy is inserted as the next generation in one statement, then one
+    statement switches `ingredient_meta` to it, then the old rows are deleted. Reads are one
+    statement that only sees the current generation.
+  - **Clock:** `ingredientSchema` refuses a `priceCollectedAt` in the future by the
+    phone's clock, which would refuse valid data on a phone whose clock is behind.
+    `storedIngredientSchema` (downloads and reads) drops only that check; the import keeps
+    the strict one.
+  - **Not wiped:** log out and account deletion leave the copy. It's shared reference
+    data, not personal data, and the next user on the phone still has it offline.
+  - **Matching:** the row's `ingredientId` if valid and known, else the exact
+    `normaliseName` of its name against each ingredient's name and aliases. A name or alias
+    shared by two different ingredients matches nothing. No fuzzy, plural or substring
+    matching ("peanut butter" is never "butter").
+  - **Shown:** one muted line on the Account page's Sync card, "Ingredient data: updated
+    Nov 19", once a copy exists. Matches carry `allergens`, `allergensReviewed` and
+    `dietTags` for the recipe filter; `allergensReviewed` false means "allergens unknown",
+    never safe.
+  - **No bundled seed file:** a first launch that is signed out or offline has no catalog
+    and behaves as before. Sign in needs a connection, so the first signed-in launch
+    downloads it.
 - **Dev build later:** after the capstone, switch to React Native Firebase and an
   EAS development build; add payments.
 - **Demo build (N-22):** a standalone release build of the same Expo Go-compatible code
@@ -354,10 +408,18 @@ users/{uid}/mealPlanEntries/{entryId}  // one recipe in one slot; recipe ID + se
   // Limits live in src/validation/mealPlanSchema.ts; mirror them in Security Rules.
 ingredients/{ingredientId}         // shared reference data
   name, pricePerUnit, nutritionPer100g, densityGramsPerCup, dietTags[], allergens[]
+  // Today: exactly ingredientSchema's fields minus id (the import writes them).
 
 libraryRecipes/{recipeId}          // LATER; separate from user recipes
 ```
 Grocery lists, meal plan cost and nutrition totals are **derived**, not stored.
+
+On the phone (SQLite, migration 6), the ingredient catalog's copy:
+```
+ingredients (generation, id, data)  // primary key (generation, id); data = the validated
+                                    // ingredient as JSON, without id
+ingredient_meta (key, value)        // keys: generation (the current copy), fetched_at, count
+```
 
 ## Sprint 1 (1 week)
 **Goals**
@@ -395,14 +457,31 @@ To be planned.
 - Choose the nutrition API and confirm its terms.
 - Define the ingredient data format (feeds cost, nutrition, unit conversion,
   diet/allergen tags and filters).
-- Edwin's CSV (`ingredients list v5.csv`) dry-runs to 199 valid and 1 skipped. Still to do:
-  - Fix the id on line 140 (`roll_dinner_+A148+A140`).
+- Edwin's CSV: `ingredients_list_v6.csv` dry-ran to 200 valid, 0 skipped, 0 warnings and
+  was imported to the real project on Nov 19, 2026 (200 documents). Still to do:
   - Decide whether the `Substitutes` column becomes a field. Today it's ignored, and
-    adding it is a data model change.
+    adding it is a data model change. It also refers to row numbers, not IDs.
   - Every row has `allergens_reviewed` false, because the column isn't in the file, so
-    the app must show "allergens unknown" until someone reviews them.
-  - Nobody has run the real import yet. It needs the real project and a key kept outside
-    the repo, and the app doesn't read ingredients yet.
+    the app must show "allergens unknown" until a second person reviews them (the testing
+    strategy requires a review of 100% of allergen cells).
+- Data issues for Edwin to check in v6 (the app doesn't correct or guess at any of them):
+  - Allergen cells to check against the product labels (possible health risk):
+    - Soy sauce and light soy sauce usually contain wheat (only soy is listed).
+    - Lactose-free sour cream is still a milk product (no allergen listed, and it's
+      tagged `vegan`).
+    - Imitation crab (pollock) usually contains wheat and eggs, and sometimes shellfish.
+    - Margarine, honey mustard and the sausages may contain milk, eggs, wheat or soy. The
+      balsamic and red wine vinegars may contain sulphites.
+  - Canned corn (calories about double normal) and canned black beans (about half of the
+    other beans) need checking against their labels.
+  - Diet tags don't stack (vegan items aren't also tagged vegetarian or pescatarian), and
+    `gluten_free`, `dairy_free` and `keto_friendly` aren't used anywhere.
+  - Rice flour has the alias "gluten free flour", which would match a store-bought
+    gluten-free blend.
+  - Milk's `gramsPerCup` is 240, which looks like a 237 ml US cup; the app's cup is 250 ml.
+    Confirm which cup every `gramsPerCup` uses.
+  - Run the dry run again after changes: it now lists any name or alias shared by two
+    ingredients.
 - Decide whether local data is wiped on logout (shared devices).
 - Account defaults to confirm, all in `src/services/account/accountDecisions.ts`:
   log out wipes local data after confirmation; session expiry signs out but keeps
@@ -444,14 +523,16 @@ To be planned.
     phone rebuilds the list from the synced recipes and meal plans, but starts with no
     check marks or added items. Log out and account deletion wipe them, and the log out
     prompt doesn't mention it yet (it only mentions recipes and meal plans).
-  - Until the ingredient catalog exists, rows are matched by name or `ingredientId` only,
-    and rows in different unit families (cups and grams, pieces and grams) are listed
-    separately.
-  - No plural matching: "Egg" and "Eggs" are two lines until the catalog matches them.
+  - Rows the catalog doesn't match (no copy downloaded yet, a name that isn't an
+    ingredient's name or alias, or an ambiguous one) are matched by name or
+    `ingredientId` only, and rows in different unit families are listed separately.
+  - No plural matching: "Egg" and "Eggs" are two lines unless the catalog lists one as the
+    other's alias (e.g. an egg ingredient with the alias "eggs").
   - The 250 ml cup is a choice (Canadian metric). A US cup is about 237 ml, so a recipe
     written in US cups is off by about 5% when combined with millilitres.
-  - A check mark belongs to a line's key. If the key changes (a future catalog matches a
-    row by ID, or a merge changes the line's unit family), that line shows as unchecked.
+  - A check mark belongs to a line's key. If the key changes (the catalog starts matching
+    a row by ID once its copy is downloaded, or a merge changes the line's unit family),
+    that line shows as unchecked.
     Check marks for lines that are no longer on the list stay stored (up to the cap) and
     come back if the line returns that week.
   - `ingredientRowSchema` doesn't check `ingredientId` against the ID pattern, so the list

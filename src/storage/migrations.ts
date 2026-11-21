@@ -92,6 +92,25 @@ export const MIGRATIONS: readonly string[] = [
   CREATE INDEX grocery_manual_items_week ON grocery_manual_items (week_start);
   PRAGMA user_version = 5;
   COMMIT;`,
+  // 6: the ingredient catalog (N-08): the last validated copy of the shared `ingredients`
+  // collection, so it works offline and signed out. Reference data, not the user's: log out
+  // and account deletion don't clear it. `data` is the validated ingredient as JSON
+  // (without id). Rows belong to a generation; ingredient_meta says which generation is the
+  // current copy (keys from a fixed list in sqliteIngredientRepository.ts), so a new copy is
+  // written where reads can't see it and then swapped in by one statement.
+  `BEGIN;
+  CREATE TABLE ingredients (
+    generation INTEGER NOT NULL,
+    id TEXT NOT NULL,
+    data TEXT NOT NULL,
+    PRIMARY KEY (generation, id)
+  );
+  CREATE TABLE ingredient_meta (
+    key TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL
+  );
+  PRAGMA user_version = 6;
+  COMMIT;`,
 ];
 
 // Brings the database up to the latest version. Safe to run on every app start.

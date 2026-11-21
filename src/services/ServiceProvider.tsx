@@ -2,6 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import type { LocalDataWiper } from "./account/LocalDataWiper";
 import type { AuthService } from "./auth/AuthService";
 import type { ConnectivityService } from "./connectivity/ConnectivityService";
+import type { IngredientRefresh } from "./ingredients/IngredientRefresh";
 import type { RemoteProfileStore } from "./profiles/RemoteProfileStore";
 import type { SecureSessionStore } from "./session/SecureSessionStore";
 import type { SessionGuard } from "./session/sessionGuard";
@@ -21,6 +22,8 @@ export type Services = {
   sessionPolicy: SessionPolicy;
   sessionGuard: SessionGuard;
   sync: SyncService;
+  // Downloads the shared ingredient data ("Sync now" forces it).
+  ingredientRefresh: IngredientRefresh;
   connectivity: ConnectivityService;
   localData: LocalDataWiper;
 };
@@ -81,6 +84,10 @@ export function useSessionGuard(): SessionGuard {
 
 export function useSyncService(): SyncService {
   return useServices().sync;
+}
+
+export function useIngredientRefresh(): IngredientRefresh {
+  return useServices().ingredientRefresh;
 }
 
 export function useConnectivity(): ConnectivityService {

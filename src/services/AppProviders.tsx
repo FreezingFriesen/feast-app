@@ -79,10 +79,16 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   // Once started, sync recipes and meal plans in the foreground (N-19): straight away if a
   // saved login was restored, and on sign in, reconnecting and local changes after that.
+  // The ingredient data refreshes at the same moments when it's over a day old (N-08).
   // Stops listening if this goes away.
   useEffect(() => {
     if (startup.status !== "ready") return;
-    return startup.app.syncEngine.start();
+    const stopSync = startup.app.syncEngine.start();
+    const stopIngredients = startup.app.ingredientEngine.start();
+    return () => {
+      stopSync();
+      stopIngredients();
+    };
   }, [startup]);
 
   // Nothing is drawn while starting. If startup failed, show why instead of the app.

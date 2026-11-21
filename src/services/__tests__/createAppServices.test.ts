@@ -131,9 +131,36 @@ describe("createAppServices with the in-memory backend", () => {
     expect(await restarted.repositories.groceries.listManualItems(week)).toEqual([]);
   });
 
-  it("wires an empty ingredient catalog until the real one exists", async () => {
+  it("starts with an empty ingredient catalog when the phone has no copy", async () => {
     const { repositories } = await setup("memory");
-    expect(repositories.ingredientCatalog.find({ name: "Flour" })).toBeUndefined();
+    await repositories.ingredientCatalog.load();
+    expect(repositories.ingredientCatalog.getSnapshot().find({ name: "Flour" })).toBeUndefined();
+    expect(repositories.ingredientCatalog.getUpdatedAt()).toBeNull();
+  });
+
+  it("downloads the ingredient catalog after sign in, keeps it in SQLite through a restart, and log out leaves it", async () => {
+    const first = await setup("memory");
+    expect(first.services.ingredientRefresh).toBe(first.ingredientEngine);
+    // Signed out: the Security Rules (and the fake) refuse the read.
+    expect(await first.ingredientEngine.refreshIfDue()).toMatchObject({ outcome: "signed_out" });
+
+    const signUp = await first.services.auth.signUp({ email: "levi@example.com", password: "correct horse battery" });
+    if (!signUp.ok) throw new Error(signUp.error);
+    expect(await first.ingredientEngine.refreshIfDue()).toEqual({ outcome: "updated", valid: 10, skipped: 0 });
+    await first.repositories.ingredientCatalog.load();
+    expect(first.repositories.ingredientCatalog.getSnapshot().find({ name: "eggs" })?.id).toBe("egg_whole_raw");
+
+    // Log out wipes the user's data, not the shared ingredient data.
+    await first.services.localData.wipe();
+    await first.repositories.ingredientCatalog.load();
+    expect(first.repositories.ingredientCatalog.getSnapshot().find({ name: "Flour" })?.id).toBe("all_purpose_flour");
+
+    // A restart, signed out and offline: the copy loads from the phone, and is still fresh.
+    const restarted = await setup("memory", first.database);
+    await restarted.repositories.ingredientCatalog.load();
+    expect(restarted.repositories.ingredientCatalog.getSnapshot().find({ name: "Flour" })?.id).toBe("all_purpose_flour");
+    expect(restarted.repositories.ingredientCatalog.getUpdatedAt()).not.toBeNull();
+    expect(await restarted.ingredientEngine.refreshIfDue()).toMatchObject({ outcome: "fresh" });
   });
 
   it("never loads the Firebase SDK or reads the Firebase values", async () => {

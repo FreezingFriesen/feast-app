@@ -1,4 +1,4 @@
-import { catalogMatchSchema, ingredientSchema, ingredientWarnings } from "../ingredientSchema";
+import { catalogMatchSchema, ingredientSchema, ingredientWarnings, storedIngredientSchema } from "../ingredientSchema";
 
 // The egg row from Edwin's dataset, with its allergen corrected to the shared list.
 const valid = {
@@ -176,16 +176,75 @@ describe("ingredientWarnings", () => {
   });
 });
 
-describe("catalogMatchSchema (what a catalog hands the grocery list)", () => {
-  it("accepts an ID with or without conversion data", () => {
+describe("storedIngredientSchema (an ingredient downloaded or read back from the phone)", () => {
+  const stored = (input: unknown) => storedIngredientSchema.safeParse(input);
+  // The day after today, by the phone's clock.
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  it("accepts what the import saves, and returns it unchanged", () => {
+    const imported = ingredientSchema.parse(valid);
+    expect(stored(imported).data).toEqual(imported);
+  });
+
+  it("accepts a price collected 'tomorrow', which a phone whose clock is behind would see", () => {
+    expect(accepts({ ...valid, priceCollectedAt: tomorrow })).toBe(false);
+    expect(stored({ ...valid, priceCollectedAt: tomorrow }).success).toBe(true);
+  });
+
+  it("keeps every other price date rule", () => {
+    for (const date of ["2019-12-31", "2026-02-30", "10/13/2026"]) {
+      expect(stored({ ...valid, priceCollectedAt: date }).success).toBe(false);
+    }
+  });
+
+  it.each([
+    ["allergens", ["gluten"]],
+    ["allergens", ["eggs", "eggs"]],
+    ["dietTags", ["vegan", "vegan"]],
+    ["packagePrice", -1],
+    ["id", "../x"],
+    ["id", "roll_dinner_+A148+A140"],
+    ["name", "a".repeat(10_000)],
+    ["name", "<script>alert(1)</script>"],
+    ["name", "'; DROP TABLE ingredients;--"],
+    ["proteinG", 40], // with carbs and fat, over 100 g
+  ])("rejects %p = %p", (field, value) => {
+    const input = field === "proteinG" ? { ...valid, proteinG: 40, carbsG: 40, fatG: 30, saturatedFatG: 1 } : { ...valid, [field]: value };
+    expect(stored(input).success).toBe(false);
+  });
+
+  it("keeps attack text in free-text fields as plain text", () => {
+    const notes = "'; DROP TABLE ingredients;-- <script>alert(1)</script>";
+    expect(stored({ ...valid, notes }).data?.notes).toBe(notes);
+  });
+
+  it("strips keys the schema doesn't have", () => {
+    expect(stored({ ...valid, isAdmin: true, pricePerUnit: 1 }).data).toEqual(valid);
+  });
+});
+
+describe("catalogMatchSchema (what a catalog hands the app)", () => {
+  it("accepts an ID with or without conversion data, and drops unknown keys", () => {
     expect(catalogMatchSchema.parse({ id: "all_purpose_flour", gramsPerCup: 125 })).toEqual({
       id: "all_purpose_flour",
       gramsPerCup: 125,
     });
-    expect(catalogMatchSchema.parse({ id: "egg_whole_raw", gramsPerPiece: 50, name: "Egg" })).toEqual({
+    expect(catalogMatchSchema.parse({ id: "egg_whole_raw", gramsPerPiece: 50, packagePrice: 4.23 })).toEqual({
       id: "egg_whole_raw",
       gramsPerPiece: 50,
     });
+  });
+
+  it("keeps the name and the safety tags", () => {
+    const match = {
+      id: "peanut_butter",
+      name: "Peanut butter",
+      gramsPerCup: 258,
+      allergens: ["peanuts"],
+      allergensReviewed: true,
+      dietTags: ["vegan"],
+    };
+    expect(catalogMatchSchema.parse(match)).toEqual(match);
   });
 
   it.each([
@@ -198,6 +257,15 @@ describe("catalogMatchSchema (what a catalog hands the grocery list)", () => {
     { id: "flour", gramsPerCup: Number.NaN },
     { id: "flour", gramsPerPiece: 5001 },
     { id: "flour", gramsPerPiece: -1 },
+    { id: "flour", name: "<script>alert(1)</script>" },
+    { id: "flour", name: "a".repeat(101) },
+    { id: "flour", name: "" },
+    { id: "flour", allergens: ["gluten"] },
+    { id: "flour", allergens: ["wheat", "wheat"] },
+    { id: "flour", allergens: "wheat" },
+    { id: "flour", allergensReviewed: "yes" },
+    { id: "flour", dietTags: ["paleo"] },
+    { id: "flour", dietTags: ["vegan", "vegan"] },
   ])("rejects %p", (match) => {
     expect(catalogMatchSchema.safeParse(match).success).toBe(false);
   });

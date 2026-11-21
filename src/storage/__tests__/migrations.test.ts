@@ -22,10 +22,12 @@ describe("migrations", () => {
     const db = createNodeSqliteDatabase();
     await runMigrations(db);
     expect(version(db)).toBe(MIGRATIONS.length);
-    expect(MIGRATIONS).toHaveLength(5);
+    expect(MIGRATIONS).toHaveLength(6);
     expect(names(db, "table")).toEqual([
       "grocery_checks",
       "grocery_manual_items",
+      "ingredient_meta",
+      "ingredients",
       "meal_plan_entries",
       "profiles",
       "recipes",
@@ -63,9 +65,34 @@ describe("migrations", () => {
     expect(version(db)).toBe(4);
 
     await runMigrations(db);
-    expect(version(db)).toBe(5);
+    expect(version(db)).toBe(MIGRATIONS.length);
     expect(db.raw.prepare("SELECT id, servings FROM meal_plan_entries").all()).toEqual([{ id: "e", servings: 4 }]);
     expect(names(db, "table")).toEqual(expect.arrayContaining(["grocery_checks", "grocery_manual_items"]));
+  });
+
+  it("upgrades a version-5 database to add the ingredient tables without losing grocery items", async () => {
+    const db = createNodeSqliteDatabase();
+    for (const migration of MIGRATIONS.slice(0, 5)) db.raw.exec(migration);
+    db.raw
+      .prepare(
+        "INSERT INTO grocery_manual_items (id, week_start, name, created_at, schema_version) VALUES ('i', '2026-11-09', 'Milk', 1, 1)",
+      )
+      .run();
+    expect(version(db)).toBe(5);
+
+    await runMigrations(db);
+    expect(version(db)).toBe(6);
+    expect(db.raw.prepare("SELECT id, name FROM grocery_manual_items").all()).toEqual([{ id: "i", name: "Milk" }]);
+    expect(names(db, "table")).toEqual(expect.arrayContaining(["ingredient_meta", "ingredients"]));
+  });
+
+  it("keys ingredient rows by generation and ID, so two copies can exist while one is swapped in", async () => {
+    const db = createNodeSqliteDatabase();
+    await runMigrations(db);
+    const insert = db.raw.prepare("INSERT INTO ingredients (generation, id, data) VALUES (?, ?, '{}')");
+    insert.run(1, "flour");
+    insert.run(2, "flour");
+    expect(() => insert.run(2, "flour")).toThrow();
   });
 
   it("new grocery items start unchecked unless they say otherwise", async () => {
@@ -105,7 +132,7 @@ describe("migrations", () => {
     await runMigrations(db);
     // A table a new migration would create already exists, so that migration fails.
     db.raw.exec(
-      "PRAGMA user_version = 1; DROP TABLE meal_plan_entries; DROP TABLE sync_meta; DROP TABLE grocery_checks; DROP TABLE grocery_manual_items;",
+      "PRAGMA user_version = 1; DROP TABLE meal_plan_entries; DROP TABLE sync_meta; DROP TABLE grocery_checks; DROP TABLE grocery_manual_items; DROP TABLE ingredients; DROP TABLE ingredient_meta;",
     );
     await expect(runMigrations(db)).rejects.toThrow();
     expect(version(db)).toBe(1);

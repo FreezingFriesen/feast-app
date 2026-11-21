@@ -1,4 +1,6 @@
 /// <reference types="node" />
+import { findNameCollisions } from "@/repositories/ingredientCatalogIndex";
+import { SAMPLE_INGREDIENTS } from "@/services/ingredients/sampleIngredients";
 import { ingredientSchema } from "@/validation/ingredientSchema";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -163,6 +165,17 @@ describe("the report", () => {
     expect(formatImportReport(checkIngredientCsv(csv(row())))).toContain("allergens unknown");
   });
 
+  it("notes a name shared by different ingredients, which the app matches to neither", () => {
+    const report = formatImportReport(checkIngredientCsv(csv(row({ id: "b_item" }), row({ id: "a_item" }))));
+    expect(report).toContain('NOTE "test item" is a name or alias of a_item, b_item, so the app matches it to none of them.');
+    // Reported only: both rows are still imported as they are.
+    expect(report).toContain("2 valid, 0 skipped");
+  });
+
+  it("has no name note when every name belongs to one ingredient", () => {
+    expect(formatImportReport(checkIngredientCsv(csv(row())))).not.toContain("is a name or alias of");
+  });
+
   it("lists duplicate ids and warnings", () => {
     const check = checkIngredientCsv(csv(row(), row()));
     expect(check.skipped).toEqual([{ line: 3, id: "test_item", reasons: ["id is used by an earlier row"] }]);
@@ -218,6 +231,24 @@ describe("the small fixture", () => {
 
   it("marks every valid row as not reviewed", () => {
     expect(check.ready.every((ingredient) => ingredient.allergensReviewed === false)).toBe(true);
+  });
+});
+
+// The emulator tests import this CSV with the real command, and the in-memory backend
+// serves SAMPLE_INGREDIENTS. They must be the same data, so both backends are tested alike.
+describe("the catalog fixture", () => {
+  const check = checkIngredientCsv(readFileSync(join(REPO_ROOT, "scripts/__fixtures__/ingredients-catalog.csv"), "utf8"));
+
+  it("imports to exactly the in-memory backend's sample ingredients", () => {
+    expect(check.skipped).toEqual([]);
+    expect(check.fixes).toEqual([]);
+    expect(check.warnings).toEqual([]);
+    expect(check.ignoredColumns).toEqual([]);
+    expect(check.ready).toEqual([...SAMPLE_INGREDIENTS]);
+  });
+
+  it("has no name or alias shared by two ingredients", () => {
+    expect(findNameCollisions(check.ready)).toEqual([]);
   });
 });
 

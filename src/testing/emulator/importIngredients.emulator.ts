@@ -3,12 +3,11 @@
 // as a real import, with a small made-up file (not Edwin's). No key is involved.
 import { initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { doc, getDocFromServer } from "firebase/firestore";
-import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { EMULATOR_PROJECT_ID } from "../contracts/firebaseHarness";
+import { REPO_ROOT, runIngredientImport } from "./runIngredientImport";
 
-const REPO_ROOT = resolve(__dirname, "../../..");
 const FIXTURE = join(REPO_ROOT, "scripts/__fixtures__/ingredients-small.csv");
 
 let env: RulesTestEnvironment;
@@ -22,17 +21,7 @@ beforeAll(async () => {
 
 afterAll(() => env.cleanup());
 
-function runImport(extraEnv: Record<string, string> = {}) {
-  // No credentials from the person's own machine can be picked up. emulators:exec has
-  // already set FIRESTORE_EMULATOR_HOST.
-  const env: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
-  if (!("GOOGLE_APPLICATION_CREDENTIALS" in extraEnv)) delete env.GOOGLE_APPLICATION_CREDENTIALS;
-  return spawnSync(
-    process.execPath,
-    [join(REPO_ROOT, "node_modules/tsx/dist/cli.mjs"), "scripts/importIngredients.ts", FIXTURE, "--write"],
-    { cwd: REPO_ROOT, env, encoding: "utf8" },
-  );
-}
+const runImport = (extraEnv: Record<string, string> = {}) => runIngredientImport(FIXTURE, extraEnv);
 
 async function readIngredient(id: string) {
   let snapshot!: Awaited<ReturnType<typeof getDocFromServer>>;
