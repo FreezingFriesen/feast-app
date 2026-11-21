@@ -58,7 +58,7 @@ Code uses `colors.<role>` from `src/theme` and **never** the swatches (`brand.*`
 | `highlight` | yellow | Fills, or text and icons **on green only** | green | 5.37 |
 | `inputBorder` | control grey | Text box and chip edges (needs 3:1) | white, cream | 4.54 / 4.14 |
 | `error` | red | Error text, error borders, the destructive button | white | 5.62 |
-| `errorText` / `errorBackground` | red dark / tint | Error message box | — | 7.87 |
+| `errorText` / `errorBackground` | red dark / tint | Error message box; `errorText` alone for allergen and diet warnings on recipe cards | `errorText` on its tint, or on white | 7.87 / 9.00 |
 | `onDestructive` | white | Destructive button label | red | 5.62 |
 | `success` / `successBackground` | green / green tint | Success message box | — | 5.77 |
 | `info` / `infoBackground` | orange / yellow tint | Info message box (orange is its edge only; text is ink) | — | 15.12 (ink) |
@@ -74,7 +74,9 @@ Also defined:
 - `welcomeGradient`: green into orange, behind the logo on the welcome screen.
 
 `contrastPairs` in `colors.ts` lists every pair the app draws. `contrast.test.ts` fails
-if any pair is below 4.5:1 for text or 3:1 for UI graphics.
+if any pair is below 4.5:1 for text or 3:1 for UI graphics. The recipe filter (#10, N-04)
+added pairs only, no colours: `errorText` on white (row warnings), the white switch thumb
+on the green and grey tracks, and the grey track on white.
 
 ## Contrast: do and don't
 
@@ -222,7 +224,33 @@ Feature components follow the same tokens:
   button stays disabled until something changes.
 - Recipe list rows (`recipes/index`): border-only cards with a trailing edit button
   (green pencil, 44pt, labelled "Edit <title>"). Only the button opens the editor;
-  tapping the row itself is kept for the detail screen.
+  tapping the row itself is kept for the detail screen. Allergen and diet notes sit under
+  the meta line (`RecipeRowNotes`, below).
+- The recipe filter (#10, N-04). **No mockup shows a filter UI**, so it's built from the
+  shared parts. **Allergen states never use green or a ✓**, and nothing says "safe": the
+  absence of a warning is the only positive signal.
+  - `features/recipes/components/LabeledSwitch`: a label (and optional muted caption)
+    with a React Native `Switch`. The whole row is one 44pt `Pressable` with
+    `accessibilityRole` "switch" and `checked` state. The `Switch` only shows the state
+    (it ignores touches and is hidden from screen readers). Track `inputBorder` when off,
+    `action` when on, thumb `surface`. Green "on" is a labelled control state, not an
+    allergen signal.
+  - `features/recipes/components/ProfileFilterRow`: "Using your allergies & diets: Milk,
+    Vegan" and the "Filter by my allergies & diets" switch, or a `TextAction` for the next
+    step ("Set your allergies & diets", "Log in to filter …", "Finish setting up …").
+  - `features/recipes/components/RecipeListHeader`: in this order, the profile row, the
+    "filter is off" `FormMessage` (info) with "Turn on", the profile error (error) with
+    Retry, the hidden count (polite live region) with "Show them", the allergen data
+    notice (info), then "Filters (n) ▾".
+  - `features/recipes/components/RecipeFilterPanel`: Diet, "Leave out allergens" and Meal
+    `ChipSelect`s, the "Also hide recipes with ingredients Feast couldn't check" switch,
+    Sort as a `SegmentedControl` (Newest, A–Z, Quickest) and "Clear filters".
+  - `features/recipes/components/RecipeRowNotes`: each note is a `DecorativeIcon` plus
+    `caption` text. "Contains: …" (warning icon) and "Tagged Vegan, but contains Milk"
+    (alert icon) are `errorText` on white; "Couldn't check: …" (help icon) is `text`.
+  - Empty states: "No recipes yet" (no recipes at all, no header) and "No recipes match
+    your filters" (funnel icon) with secondary "Clear filters" and "Turn off my allergy &
+    diet filter" buttons, whichever applies.
 - `features/grocery/components/WeekSelector`: 44pt previous and next chevrons in `text`
   (faded and disabled at the planner's date limits), the week's dates as a `heading`,
   "This week" as a muted caption, and a "Back to this week" `TextAction` once the user
@@ -268,7 +296,7 @@ Feature components follow the same tokens:
 
 | Route | Mockup | Status | Plan IDs |
 |---|---|---|---|
-| `(tabs)/recipes/index` | none (brand defaults) | Done; each row has an edit button | #1, N-01 |
+| `(tabs)/recipes/index` | none (brand defaults; no mockup has a filter UI) | Done; each row has an edit button; profile filter, Filters panel, sort and allergen notes | #1, N-01, #10, N-04, N-03 (part) |
 | `(tabs)/recipes/new` | none (brand defaults) | Done | N-01, #5 |
 | `(tabs)/recipes/edit/[id]` | none (brand defaults) | Done (same form as new) | N-01 |
 | recipe detail | `04-recipe-detail.png` | **Not built** (no route) | N-01, #8 |

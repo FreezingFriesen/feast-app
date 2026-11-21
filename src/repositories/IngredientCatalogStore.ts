@@ -7,6 +7,13 @@ import { emptyIngredientCatalog, type IngredientCatalog } from "./IngredientCata
 import { buildIngredientCatalog } from "./ingredientCatalogIndex";
 import type { IngredientRepository } from "./IngredientRepository";
 
+// Where the catalog is at:
+// - loading: the first read of the phone's copy hasn't finished. The catalog is empty for
+//   now, but that says nothing about the data, so the recipe filter waits (#10, N-04).
+// - empty: the phone has no copy (never downloaded), or it couldn't be read.
+// - ready: the catalog holds at least one ingredient.
+export type IngredientCatalogStatus = "loading" | "empty" | "ready";
+
 export type IngredientCatalogStore = {
   // The current catalog. The same object until the data changes, then a new frozen one
   // (what useSyncExternalStore needs). Empty until the first load finishes.
@@ -14,6 +21,8 @@ export type IngredientCatalogStore = {
   // When the copy shown was downloaded, or null if there is none (the Account page says
   // "Ingredient data: updated …").
   getUpdatedAt(): number | null;
+  // See IngredientCatalogStatus. Changes only when listeners are told.
+  getStatus(): IngredientCatalogStatus;
   // Called after every load. Returns a function that stops listening.
   subscribe(listener: () => void): () => void;
   // Reads the copy from the phone. Never rejects: if it can't be read, the catalog the app
@@ -26,10 +35,12 @@ export function createIngredientCatalogStore(
 ): IngredientCatalogStore {
   let snapshot: IngredientCatalog = emptyIngredientCatalog;
   let updatedAt: number | null = null;
+  let status: IngredientCatalogStatus = "loading";
   // Each load gets a number; only the latest one started may change the snapshot, so a
   // slow read of an older copy can't replace a newer one.
   let latestLoad = 0;
   const listeners = new Set<() => void>();
+  const notify = () => listeners.forEach((listener) => listener());
 
   async function load() {
     latestLoad += 1;
@@ -39,9 +50,16 @@ export function createIngredientCatalogStore(
       if (thisLoad !== latestLoad) return;
       snapshot = buildIngredientCatalog(ingredients);
       updatedAt = ingredients.length > 0 ? (meta?.fetchedAt ?? null) : null;
-      listeners.forEach((listener) => listener());
+      status = ingredients.length > 0 ? "ready" : "empty";
+      notify();
     } catch {
-      // Nothing is lost: the copy stays in the database for the next load.
+      // Nothing is lost: the copy stays in the database for the next load. If this was
+      // the first read, the app carries on with the empty catalog, so say it has settled
+      // (the recipe filter would otherwise wait forever).
+      if (status === "loading" && thisLoad === latestLoad) {
+        status = "empty";
+        notify();
+      }
     }
   }
 
@@ -51,6 +69,7 @@ export function createIngredientCatalogStore(
   return {
     getSnapshot: () => snapshot,
     getUpdatedAt: () => updatedAt,
+    getStatus: () => status,
     subscribe(listener) {
       listeners.add(listener);
       return () => {

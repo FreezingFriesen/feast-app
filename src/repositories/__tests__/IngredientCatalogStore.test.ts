@@ -28,6 +28,46 @@ describe("ingredient catalog store", () => {
     expect(store.getUpdatedAt()).toBeNull();
   });
 
+  describe("status (what the recipe filter waits for)", () => {
+    it("is loading until the first read finishes, then ready when the phone has a copy", async () => {
+      const { store, listener } = await setup([...SAMPLE_INGREDIENTS]);
+      expect(store.getStatus()).toBe("loading");
+      await store.load();
+      expect(store.getStatus()).toBe("ready");
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("is empty when the phone has never downloaded a copy", async () => {
+      const { store } = await setup();
+      await store.load();
+      expect(store.getStatus()).toBe("empty");
+    });
+
+    it("settles on empty, and says so, if the first read fails", async () => {
+      const { store, repository, listener } = await setup([...SAMPLE_INGREDIENTS]);
+      jest.spyOn(repository, "list").mockRejectedValueOnce(domainError("storage_failed"));
+      await store.load();
+      expect(store.getStatus()).toBe("empty");
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays ready when a later read fails", async () => {
+      const { store, repository } = await setup([...SAMPLE_INGREDIENTS]);
+      await store.load();
+      jest.spyOn(repository, "list").mockRejectedValueOnce(domainError("storage_failed"));
+      await store.load();
+      expect(store.getStatus()).toBe("ready");
+    });
+
+    it("goes back to empty when the copy is cleared", async () => {
+      const { store, repository } = await setup([...SAMPLE_INGREDIENTS]);
+      await store.load();
+      await repository.clear();
+      await settle();
+      expect(store.getStatus()).toBe("empty");
+    });
+  });
+
   it("loads the copy from the phone, tells listeners, and says when it was downloaded", async () => {
     const { store, listener } = await setup([...SAMPLE_INGREDIENTS]);
     await store.load();

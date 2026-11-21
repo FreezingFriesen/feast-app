@@ -50,6 +50,41 @@ renamed, so it reads as unmatched. Still to do for N-01: the recipe detail scree
 delete (`remove`, a soft delete, is in the repository but no screen uses it). Leaving
 the edit screen doesn't ask before discarding changes (needs Expo SDK 58, see Open items).
 
+Filtering and sorting (#10, N-04, and the diet, allergy and meal type part of N-03) is
+built on the Recipes tab. #10 and N-04 aren't ticked until it's merged and checked on a
+phone against the decision table in
+`src/features/recipes/filter/__tests__/recipeFilter.test.ts`. Still to do for N-03:
+filters by ingredient and by high or low protein, fibre, etc. The rules:
+- **Allergens come from the ingredient catalog** on the phone. They're worked out from each
+  ingredient row when the recipe is read (`assessRecipeAllergens`) and never stored. A
+  listed allergen always counts, reviewed or not. A row with no valid match is "couldn't
+  check", never "no allergens". A recipe is "fully checked" only when every row matched an
+  ingredient whose allergens have been reviewed, which no recipe can be today.
+- **The user's allergies and diets apply by default**, every time the app starts. Turning
+  the filter off lasts only for this user with these restrictions, in memory, so it comes
+  back on after a restart, for another user, or when the restrictions change. While it's
+  off, the screen says so, and recipes with the user's allergens show "Contains: …".
+- **Diets are AND**, and only the author's own tags count: an untagged recipe never
+  matches. A tag the recipe's allergens contradict (`DIET_CONFLICTS`: vegan rules out milk,
+  eggs, fish and shellfish; vegetarian fish and shellfish; dairy-free milk; gluten-free
+  wheat) doesn't match. For the user's own diets, the row says "Tagged Vegan, but contains
+  Milk". Ingredient diet tags are never used.
+- **Allergens left out** (the profile's, or chosen under Filters) hide every recipe that
+  contains one. Recipes with rows that couldn't be checked stay visible with
+  "Couldn't check: …" (at most 3 names), unless "Also hide recipes with ingredients Feast
+  couldn't check" is on.
+- **Meal types are OR.** Sorts: Newest (the most recently edited), A–Z and Quickest (prep
+  plus cook time, recipes with no time last).
+- **The screen waits** (spinner) for the recipes, the profile and the first read of the
+  catalog, so it never shows an unfiltered list as if it were filtered. If the profile
+  can't load, it says so, offers Retry, and doesn't filter by it.
+- **Counts and notices:** "N recipes hidden by your allergies & diets" with "Show them"
+  (turns the filter off). A recipe hidden by the profile and a filter counts once, under
+  the profile. While allergens are left out, a notice says the ingredient data hasn't
+  downloaded yet, or that it hasn't been fully reviewed ("Always check labels").
+- **View only:** the meal planner, grocery list and sync don't change. Filter choices are
+  never stored.
+
 ### Meal planning
 - [ ] #4 Weekly meal planner
 - [ ] #17 Breakfast, Lunch and Dinner slots for each day
@@ -327,7 +362,10 @@ build have been installed and checked on real phones against the demo project.
     in-memory, one contract suite, also on the emulators against data written by the real
     import command); `IngredientRepository` (SQLite and in-memory, one contract suite);
     `IngredientCatalogStore` (what `Repositories` holds; `useIngredientCatalog()` reads it
-    with `useSyncExternalStore`); `createIngredientRefresh` (the download). The in-memory
+    with `useSyncExternalStore`, and `useIngredientCatalogStatus()` reads its `getStatus()`:
+    `loading` until the first read of the phone's copy finishes, then `empty` or `ready`);
+    `findCheckedMatch` (`src/repositories/checkedCatalogMatch.ts`, the one checked lookup the
+    grocery list and the recipe filter share); `createIngredientRefresh` (the download). The in-memory
     backend serves a 10-row made-up list (`sampleIngredients.ts`, identical to
     `scripts/__fixtures__/ingredients-catalog.csv`).
   - **When it downloads:** at app start, after sign in and when the connection comes back,
@@ -359,8 +397,13 @@ build have been installed and checked on real phones against the demo project.
     matching ("peanut butter" is never "butter").
   - **Shown:** one muted line on the Account page's Sync card, "Ingredient data: updated
     Nov 19", once a copy exists. Matches carry `allergens`, `allergensReviewed` and
-    `dietTags` for the recipe filter; `allergensReviewed` false means "allergens unknown",
-    never safe.
+    `dietTags`; the recipe filter (#10, N-04) uses `allergens` and `allergensReviewed`.
+    `allergensReviewed` false means "allergens unknown", never safe.
+  - **Checked once per snapshot:** `findCheckedMatch` checks every match with
+    `catalogMatchSchema` and treats a failed check, or a `find` that throws, as no match.
+    A match that is frozen (with frozen lists), as `buildIngredientCatalog` hands out, is
+    checked once and the result kept in a `WeakMap`, because the recipe filter looks up tens
+    of thousands of rows (1,000 recipes × 50 rows run in about 100 ms in Jest).
   - **No bundled seed file:** a first launch that is signed out or offline has no catalog
     and behaves as before. Sign in needs a connection, so the first signed-in launch
     downloads it.
@@ -539,8 +582,20 @@ To be planned.
     ignores an `ingredientId` that isn't a valid ID and matches that row by name.
   - A decimal comma ("1,5") in the amount box is refused as "Enter a number", the same as
     in the recipe form.
-- The Account page says recipes are filtered by dietary restrictions by default
-  (N-04), but that filter isn't built yet.
+- Known limits of the recipe filter (#10, N-04):
+  - Name matching is exact (no fuzzy or plural matching), so many rows people type show
+    "Couldn't check": against the real v6 data even "Flour" doesn't match ("All-purpose
+    flour", aliases "plain flour" and "white flour"). The form has no ingredient picker to
+    set `ingredientId`; adding one is the next step and would raise match rates a lot.
+  - Every v6 ingredient has `allergensReviewed` false, so no recipe is "fully checked" and
+    the "not fully reviewed" notice shows whenever allergens are left out.
+  - Allergens Edwin's data doesn't list can't be caught (e.g. the wheat usually in soy
+    sauce, the milk in lactose-free sour cream). See "Data issues for Edwin" above.
+  - The author can't mark allergens on a recipe yet (Phase 3 of the filter work: a data
+    model change, waiting for a decision), so rows that never match, like "Hoisin sauce",
+    stay "Couldn't check".
+  - The meal planner's recipe picker doesn't use the profile filter yet (Phase 4).
+  - "Newest" sorts by `updatedAt`, so it really means "most recently edited".
 - Re-authenticating (e.g. to change password) doesn't restart the 30-day session
   on the device. The planned server-side `auth_time` check would restart it, so
   the device is stricter. Decide whether re-authentication should count as a new
