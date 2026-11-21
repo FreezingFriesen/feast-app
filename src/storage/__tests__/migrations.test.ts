@@ -1,3 +1,4 @@
+import { createSqliteRecipeRepository } from "@/repositories/sqliteRecipeRepository";
 import { createNodeSqliteDatabase } from "@/testing/nodeSqliteDatabase";
 import { MIGRATIONS, runMigrations } from "../migrations";
 
@@ -22,7 +23,7 @@ describe("migrations", () => {
     const db = createNodeSqliteDatabase();
     await runMigrations(db);
     expect(version(db)).toBe(MIGRATIONS.length);
-    expect(MIGRATIONS).toHaveLength(6);
+    expect(MIGRATIONS).toHaveLength(7);
     expect(names(db, "table")).toEqual([
       "grocery_checks",
       "grocery_manual_items",
@@ -81,9 +82,47 @@ describe("migrations", () => {
     expect(version(db)).toBe(5);
 
     await runMigrations(db);
-    expect(version(db)).toBe(6);
+    expect(version(db)).toBe(MIGRATIONS.length);
     expect(db.raw.prepare("SELECT id, name FROM grocery_manual_items").all()).toEqual([{ id: "i", name: "Milk" }]);
     expect(names(db, "table")).toEqual(expect.arrayContaining(["ingredient_meta", "ingredients"]));
+  });
+
+  it("upgrades a version-6 database to add marked allergens; existing recipes read as none marked", async () => {
+    const db = createNodeSqliteDatabase();
+    for (const migration of MIGRATIONS.slice(0, 6)) db.raw.exec(migration);
+    db.raw
+      .prepare(
+        `INSERT INTO recipes (id, title, servings, meal_types, ingredients, steps, diet_tags, created_at, updated_at, schema_version, dirty)
+         VALUES ('pancakes-1', 'Pancakes', 4, '[]', '[{"name":"Flour","quantity":200,"unit":"g"}]', '["Mix"]', '[]', ?, ?, 1, 0)`,
+      )
+      .run(Date.UTC(2026, 9, 1), Date.UTC(2026, 9, 1));
+    expect(version(db)).toBe(6);
+
+    await runMigrations(db);
+    expect(version(db)).toBe(7);
+    expect(db.raw.prepare("SELECT allergens, dirty FROM recipes").get()).toEqual({ allergens: "[]", dirty: 0 });
+    const recipe = await createSqliteRecipeRepository(db).getById("pancakes-1");
+    expect(recipe).toMatchObject({ title: "Pancakes", allergens: [], ingredients: [{ name: "Flour", quantity: 200, unit: "g" }] });
+    // The upgrade doesn't mark anything for upload.
+    expect(await createSqliteRecipeRepository(db).pendingCount()).toBe(0);
+  });
+
+  it("new recipe rows without marked allergens get an empty list, never NULL", async () => {
+    const db = createNodeSqliteDatabase();
+    await runMigrations(db);
+    const insert = () =>
+      db.raw
+        .prepare(
+          "INSERT INTO recipes (id, title, servings, meal_types, ingredients, steps, diet_tags, created_at, updated_at, schema_version, allergens) VALUES ('r', 'R', 1, '[]', '[]', '[]', '[]', 1, 1, 1, NULL)",
+        )
+        .run();
+    expect(insert).toThrow();
+    db.raw
+      .prepare(
+        "INSERT INTO recipes (id, title, servings, meal_types, ingredients, steps, diet_tags, created_at, updated_at, schema_version) VALUES ('r', 'R', 1, '[]', '[]', '[]', '[]', 1, 1, 1)",
+      )
+      .run();
+    expect(db.raw.prepare("SELECT allergens FROM recipes").get()).toEqual({ allergens: "[]" });
   });
 
   it("keys ingredient rows by generation and ID, so two copies can exist while one is swapped in", async () => {

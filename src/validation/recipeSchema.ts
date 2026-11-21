@@ -26,8 +26,8 @@ export const MAX_INGREDIENT_FIELD_LENGTH = 100;
 export const UNITS = ["g","kg","ml","l","tsp","tbsp","cup","oz","lb","piece","pinch"] as const;
 export const DIET_TAGS = ["vegan","vegetarian","pescatarian","keto_friendly","gluten_free","dairy_free"] as const;
 export const MEAL_TYPES = ["breakfast","lunch","dinner","snack"] as const;
-// Health Canada's priority food allergens. Shared by recipes (computed from ingredients),
-// user profiles (N-18) and the ingredient data, so all three use the same values.
+// Health Canada's priority food allergens. Shared by recipes (the allergens the author
+// marks), user profiles (N-18) and the ingredient data, so all three use the same values.
 export const ALLERGENS = ["peanuts","tree_nuts","milk","eggs","fish","shellfish","sesame","soy","wheat","mustard","sulphites"] as const;
 
 // Helpers: clean the text first (remove control/invisible characters, trim),
@@ -71,6 +71,10 @@ export const recipeSchema = z.object({
   ingredients: z.array(ingredientRowSchema).min(1).max(MAX_INGREDIENTS),
   steps: z.array(safeText(1, MAX_STEP_LENGTH)).min(1).max(MAX_STEPS),
   dietTags: z.array(z.enum(DIET_TAGS)).max(6).transform(inVocabularyOrder(DIET_TAGS)).default([]),
+  // Allergens the author says this recipe contains (#10). Empty means "none marked", never
+  // "allergen-free". The allergens the ingredient catalog finds are worked out when the
+  // recipe is read and never stored here (see src/features/recipes/filter/).
+  allergens: z.array(z.enum(ALLERGENS)).max(ALLERGENS.length).transform(inVocabularyOrder(ALLERGENS)).default([]),
   notes: safeText(0, 1000).optional(),
 });
 
@@ -79,10 +83,18 @@ export const recipeSchema = z.object({
 // this. It accepts the same fields as validRecipe in firestore.rules, and checks more
 // inside the lists (each ingredient row and step), which the Rules can't.
 // The tag lists are required here (the Rules require them) and can't hold duplicates.
+// allergens is optional in the Rules, so a record saved before it existed reads as
+// "none marked" ([]). That's why adding it didn't need a new RECIPE_SCHEMA_VERSION.
 export const storedRecipeSchema = recipeSchema
   .extend({
     mealTypes: z.array(z.enum(MEAL_TYPES)).max(4).refine(noDuplicates).transform(inVocabularyOrder(MEAL_TYPES)),
     dietTags: z.array(z.enum(DIET_TAGS)).max(6).refine(noDuplicates).transform(inVocabularyOrder(DIET_TAGS)),
+    allergens: z
+      .array(z.enum(ALLERGENS))
+      .max(ALLERGENS.length)
+      .refine(noDuplicates)
+      .transform(inVocabularyOrder(ALLERGENS))
+      .default([]),
     ...storedRecordFields(RECIPE_SCHEMA_VERSION),
   })
   .refine(datesInOrder, DATES_IN_ORDER_ISSUE);

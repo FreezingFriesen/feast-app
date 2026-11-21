@@ -4,7 +4,7 @@
 // Wording rules (health risk): nothing here ever says "safe", "allergen-free" or "OK for
 // you", and no state is shown in green or with a tick. The absence of a warning is the
 // only positive signal, and the screen says when the data behind it is incomplete.
-import { formatOptionLabel } from "@/components/form/ChipSelect";
+import { formatOptionLabel } from "@/components/form/formatOptionLabel";
 import { describeRestrictions } from "@/features/account/dietaryRestrictionsForm";
 import type { Allergen, DietTag } from "@/repositories/IngredientCatalog";
 import type { IngredientCatalogStatus } from "@/repositories/IngredientCatalogStore";

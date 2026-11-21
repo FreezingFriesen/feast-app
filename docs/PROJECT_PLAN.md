@@ -51,15 +51,28 @@ delete (`remove`, a soft delete, is in the repository but no screen uses it). Le
 the edit screen doesn't ask before discarding changes (needs Expo SDK 58, see Open items).
 
 Filtering and sorting (#10, N-04, and the diet, allergy and meal type part of N-03) is
-built on the Recipes tab. #10 and N-04 aren't ticked until it's merged and checked on a
-phone against the decision table in
-`src/features/recipes/filter/__tests__/recipeFilter.test.ts`. Still to do for N-03:
-filters by ingredient and by high or low protein, fibre, etc. The rules:
+built on the Recipes tab. The Phase 2 hand check also runs in code, on the real
+repositories and SQLite:
+- `src/features/recipes/__tests__/recipeFilterHandCheck.test.ts` (`npm test`): the memory
+  backend through `createAppServices`, every row of the decision table, and a restart
+  offline.
+- `src/testing/emulator/recipeFilter.emulator.ts` (`npm run test:backend`): sign up,
+  download the ingredient data from Firestore, then airplane mode and a restart, with the
+  profile filter still working from the phone's copy.
+
+#10 and N-04 aren't ticked until it's merged and a person has checked the screen on a
+phone: the switch and "Show them", the row notes, large text, a screen reader, and the
+"Set your allergies & diets" link opening with Back. Still to do for N-03: filters by
+ingredient and by high or low protein, fibre, etc. The rules:
 - **Allergens come from the ingredient catalog** on the phone. They're worked out from each
   ingredient row when the recipe is read (`assessRecipeAllergens`) and never stored. A
   listed allergen always counts, reviewed or not. A row with no valid match is "couldn't
   check", never "no allergens". A recipe is "fully checked" only when every row matched an
   ingredient whose allergens have been reviewed, which no recipe can be today.
+- **Allergens the author marks** ("Contains these allergens" in the recipe form, stored in
+  the recipe's `allergens`) are added to the catalog's and count the same way. Marking can
+  only add warnings: an empty list means "none marked", and a marked recipe's unmatched rows
+  are still "couldn't check".
 - **The user's allergies and diets apply by default**, every time the app starts. Turning
   the filter off lasts only for this user with these restrictions, in memory, so it comes
   back on after a restart, for another user, or when the restrictions change. While it's
@@ -259,7 +272,8 @@ build have been installed and checked on real phones against the demo project.
   `src/storage/migrations.ts` as numbered, constant SQL migrations: 1 `profiles`,
   2 `recipes`, 3 `meal_plan_entries` (#1), 4 `sync_meta` (N-19), 5 `grocery_checks` and
   `grocery_manual_items` (N-10, local only), 6 `ingredients` and `ingredient_meta` (N-08,
-  the ingredient catalog's copy). Lists are stored as JSON text, length-capped
+  the ingredient catalog's copy), 7 `recipes.allergens` (#10, the allergens the author
+  marks; existing rows get `'[]'`). Lists are stored as JSON text, length-capped
   before parsing, and every row read back is validated with the stored-record schemas
   (`storedRecipeSchema`, `storedMealPlanEntrySchema`, `storedManualGroceryItemSchema`); a
   row that fails reads as missing. The same repositories are used with both backends.
@@ -322,6 +336,18 @@ build have been installed and checked on real phones against the demo project.
     keep the native header.
 - **Login by email**; username is a unique display name stored in a `usernames`
   collection.
+- **Marked allergens (#10):** a recipe's `allergens` are the allergens its author marks.
+  - `recipeSchema` defaults the list to `[]`. `storedRecipeSchema` also refuses duplicates
+    and reads a record without the field as `[]`. In SQLite it's a JSON column (migration 7,
+    `NOT NULL DEFAULT '[]'`), and a row whose list can't be read reads as missing, never as
+    "none marked". Uploads include it through `REMOTE_DOCUMENT_KEYS`; the Rules already
+    checked it (`validChoices`: the 11 allergens, no duplicates).
+  - `RECIPE_SCHEMA_VERSION` stays 1. The field is optional in the Rules and defaults to
+    `[]` on every device, so a document without it is still a valid version-1 recipe that
+    means "none marked". Raising the version would need a Rules change, and copies of the app
+    that expect version 1 would then skip every recipe edited on a newer phone. The cost: a
+    copy from before #10 drops the field when it re-uploads an edit (see Known limits of the
+    recipe filter). No app has been released, so only the team's own copies are affected.
 - **Grocery list (#6, N-07 to N-10):** derived, never stored. The engine is pure
   functions in `src/features/grocery/`:
   - `generateGroceryList` takes the week's entries, recipes by ID and an injected
@@ -435,7 +461,9 @@ users/{uid}/recipes/{recipeId}
   title, servings
   ingredients[]: { ingredientId, name, quantity (number), unit (enum), note?, rawText? }
   steps[]
-  dietTags[], allergens[]          // allergens computed from ingredients
+  dietTags[], allergens[]          // allergens = what the author marks (#10). Optional:
+                                   // missing means none marked, never allergen-free.
+                                   // Catalog allergens are worked out when read, never stored.
   source?: { type: "url"|"social"|"email"|"photo"|"manual", name?, url?, importedAt? }
   createdAt, updatedAt, deletedAt?
   schemaVersion
@@ -591,9 +619,13 @@ To be planned.
     the "not fully reviewed" notice shows whenever allergens are left out.
   - Allergens Edwin's data doesn't list can't be caught (e.g. the wheat usually in soy
     sauce, the milk in lactose-free sour cream). See "Data issues for Edwin" above.
-  - The author can't mark allergens on a recipe yet (Phase 3 of the filter work: a data
-    model change, waiting for a decision), so rows that never match, like "Hoisin sauce",
-    stay "Couldn't check".
+  - Marking allergens on a recipe doesn't make its unmatched rows checked: "Hoisin sauce"
+    stays "Couldn't check" even when the author marked soy. An empty list means "none
+    marked", never "allergen-free".
+  - A copy of the app from before marked allergens (#10) drops the field when it uploads
+    an edit, because its schema doesn't know it. Everyone on the team must update before
+    marking allergens. No app has been released, so there are no old copies outside the
+    team (see "Marked allergens" in Technical decisions).
   - The meal planner's recipe picker doesn't use the profile filter yet (Phase 4).
   - "Newest" sorts by `updatedAt`, so it really means "most recently edited".
 - Re-authenticating (e.g. to change password) doesn't restart the 30-day session
@@ -687,11 +719,11 @@ To be planned.
   in its own account, and every device validates downloads before using them. The
   full list is at the top of `firestore.rules`. A Cloud Function (Blaze plan) could
   check them on the server later. No data model change is planned for this.
-- The recipe Rules accept an optional `allergens` list (the data model computes it from
-  the ingredients), but `recipeSchema` doesn't produce it yet, and `storedRecipeSchema`
-  drops it from downloads. Add it to both when the allergen computation is built. `source` in the data model isn't in `recipeSchema`
-  either, so the Rules refuse it until recipe import is built (the ingredient row's
-  `rawText` isn't in `ingredientRowSchema`, and rows aren't checked by the Rules).
+- The recipe Rules accept an optional `allergens` list. Since #10 it holds the allergens the
+  author marks (`recipeSchema`, `storedRecipeSchema`, migration 7). `source` in the data
+  model isn't in `recipeSchema`, so the Rules refuse it until recipe import is built (the
+  ingredient row's `rawText` isn't in `ingredientRowSchema`, and rows aren't checked by the
+  Rules).
 - Design questions for Alex (N-21; the full list is in `docs/DESIGN_SYSTEM.md`):
   - Is cream `#FFF2E9` official? Are ink `#1F1F1F` and error red `#C62828` OK?
   - Which fonts do the mockups use, and what are their licences?

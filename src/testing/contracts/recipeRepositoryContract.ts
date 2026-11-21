@@ -24,6 +24,7 @@ export const INCOMING_RECIPE = {
   ...RECIPE_INPUT,
   mealTypes: ["dinner"],
   dietTags: [],
+  allergens: [],
   createdAt: T0,
   updatedAt: T0,
   schemaVersion: 1,
@@ -74,6 +75,7 @@ export function describeRecipeRepositoryContract(
           ...RECIPE_INPUT,
           mealTypes: [],
           dietTags: [],
+          allergens: [],
           id: recipe.id,
           createdAt: T0 + 1_000,
           updatedAt: T0 + 1_000,
@@ -394,11 +396,12 @@ export function describeRecipeRepositoryContract(
 
       it("stores the parsed data, not the raw input", async () => {
         const { repo } = await setup();
-        await repo.mergeIncoming(INCOMING_ID, { ...INCOMING_RECIPE, id: "other", isAdmin: true, allergens: ["milk"] });
+        await repo.mergeIncoming(INCOMING_ID, { ...INCOMING_RECIPE, id: "other", isAdmin: true, allergens: ["wheat", "milk"] });
         const recipe = await repo.getById(INCOMING_ID);
         expect(recipe?.id).toBe(INCOMING_ID);
         expect(recipe).not.toHaveProperty("isAdmin");
-        expect(recipe).not.toHaveProperty("allergens");
+        // The marked allergens are a real field now (#10), kept in vocabulary order.
+        expect(recipe?.allergens).toEqual(["milk", "wheat"]);
       });
 
       it("last edit wins: newer replaces, older and equal keep the local copy", async () => {
@@ -500,13 +503,73 @@ export function describeRecipeRepositoryContract(
             mealTypes: ["dinner", "lunch"],
             ingredients: [{ name: "Apples", quantity: 6, unit: "piece", note: "tart", ingredientId: "apple" }],
             dietTags: ["vegetarian"],
+            allergens: ["wheat", "milk"],
           }),
         );
+        expect(recipe.allergens).toEqual(["milk", "wheat"]);
         const [upload] = await phone.repo.listPending(10);
 
         const tablet = await setup();
         expect(await tablet.repo.mergeIncoming(upload.id, upload.data)).toBe("applied");
         expect(await tablet.repo.getById(recipe.id)).toStrictEqual(recipe);
+      });
+    });
+
+    describe("allergens the author marks (#10)", () => {
+      it("are stored in vocabulary order without repeats, read back everywhere, and uploaded", async () => {
+        const { repo } = await setup();
+        const recipe = expectCreated(await repo.create({ ...RECIPE_INPUT, allergens: ["wheat", "milk", "wheat"] }));
+        expect(recipe.allergens).toEqual(["milk", "wheat"]);
+        expect((await repo.getById(recipe.id))?.allergens).toEqual(["milk", "wheat"]);
+        expect((await repo.list())[0].allergens).toEqual(["milk", "wheat"]);
+        const [upload] = await repo.listPending(10);
+        expect(upload.data.allergens).toEqual(["milk", "wheat"]);
+      });
+
+      it("default to none marked when the input leaves them out", async () => {
+        const { repo } = await setup();
+        expect(expectCreated(await repo.create(RECIPE_INPUT)).allergens).toEqual([]);
+      });
+
+      it("are replaced by an edit", async () => {
+        const { repo } = await setup();
+        const recipe = expectCreated(await repo.create({ ...RECIPE_INPUT, allergens: ["milk"] }));
+        expect(expectUpdated(await repo.update(recipe.id, { ...RECIPE_INPUT, allergens: ["eggs", "soy"] })).allergens).toEqual([
+          "eggs",
+          "soy",
+        ]);
+        expect((await repo.getById(recipe.id))?.allergens).toEqual(["eggs", "soy"]);
+      });
+
+      it.each<[string, unknown]>([
+        ["an allergen that isn't on the list", ["gluten"]],
+        ["a capitalised allergen", ["Milk"]],
+        ["an attack string", ["'; DROP TABLE recipes;--"]],
+        ["more than the 11 allergens", ["milk", "milk", "milk", "milk", "milk", "milk", "milk", "milk", "milk", "milk", "milk", "milk"]],
+        ["a single string instead of a list", "milk"],
+        ["null", null],
+      ])("refuses %s, saving nothing", async (_label, allergens) => {
+        const { repo } = await setup();
+        expect((await repo.create({ ...RECIPE_INPUT, allergens })).ok).toBe(false);
+        expect(await repo.list()).toEqual([]);
+      });
+
+      it("a download saved before the field existed reads as none marked", async () => {
+        const { repo } = await setup();
+        const { allergens: _allergens, ...older } = INCOMING_RECIPE;
+        expect(await repo.mergeIncoming(INCOMING_ID, older)).toBe("applied");
+        expect((await repo.getById(INCOMING_ID))?.allergens).toEqual([]);
+      });
+
+      it.each<[string, unknown]>([
+        ["a repeated allergen", ["milk", "milk"]],
+        ["an allergen that isn't on the list", ["gluten"]],
+        ["null", null],
+        ["a string", "milk"],
+      ])("refuses a download with %s", async (_label, allergens) => {
+        const { repo } = await setup();
+        expect(await repo.mergeIncoming(INCOMING_ID, { ...INCOMING_RECIPE, allergens })).toBe("invalid");
+        expect(await repo.getById(INCOMING_ID)).toBeUndefined();
       });
     });
 

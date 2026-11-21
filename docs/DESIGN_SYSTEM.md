@@ -205,7 +205,7 @@ unless noted.
 | `form/FormField` + `FieldError` | TextInput props + `label?`, `error?` | White box, `inputBorder`, radius 12, at least 48 tall. Red edge and message on error | Uses the label as `accessibilityLabel` |
 | `form/FormMessage` | `tone: error \| info \| success`, `message` | Each tone has an icon and a tinted box | Error is an alert; all are polite live regions |
 | `form/SubmitButton` | `label`, `busyLabel?`, `busy?`, `disabled?`, `variant` | primary (green), secondary (white, green edge), destructive (red). Spinner while busy, faded when inactive | button with disabled and busy state |
-| `form/ChipSelect` | `options`, `selected`, `onToggle`, `formatLabel?` | `inputBorder` edge. Selected: green with a ✓ | button with selected state |
+| `form/ChipSelect` | `options`, `selected`, `onToggle`, `formatLabel?` (defaults to `formatOptionLabel`, a plain module in `form/formatOptionLabel.ts` that pure code can use too) | `inputBorder` edge. Selected: green with a ✓ | button with selected state |
 | `SegmentedControl` | `options`, `value`, `onChange` | Cream track, white selected pill with bold green text | tablist / tab with selected state |
 | `TextAction` | `label`, `onPress`, `disabled?`, `tone`, `align?: center \| start`, `accessibilityLabel?` | Green text, or red for destructive | button with disabled state, hitSlop to 44pt |
 | `features/account/components/AccountSection` | `title`, `children` | White card with a green group heading | Title is a header |
@@ -221,7 +221,11 @@ Feature components follow the same tokens:
 - `features/recipes/components/RecipeForm`: the recipe form shared by New Recipe and
   Edit Recipe (text boxes, chips, ingredient cards, steps). It takes `initialValues`,
   the button labels and `onSubmit`, and never saves anything itself. On edit, the save
-  button stays disabled until something changes.
+  button stays disabled until something changes. After Diet tags, "Contains these
+  allergens" (#10): a `ChipSelect` of the 11 allergens under a muted `caption` line, "Mark
+  anything this recipe contains. Leaving this empty doesn't mean the recipe is free of
+  allergens." Selected chips use the usual green with a ✓, as on Allergies & Diets: they
+  show a choice, never "safe".
 - Recipe list rows (`recipes/index`): border-only cards with a trailing edit button
   (green pencil, 44pt, labelled "Edit <title>"). Only the button opens the editor;
   tapping the row itself is kept for the detail screen. Allergen and diet notes sit under
@@ -297,8 +301,8 @@ Feature components follow the same tokens:
 | Route | Mockup | Status | Plan IDs |
 |---|---|---|---|
 | `(tabs)/recipes/index` | none (brand defaults; no mockup has a filter UI) | Done; each row has an edit button; profile filter, Filters panel, sort and allergen notes | #1, N-01, #10, N-04, N-03 (part) |
-| `(tabs)/recipes/new` | none (brand defaults) | Done | N-01, #5 |
-| `(tabs)/recipes/edit/[id]` | none (brand defaults) | Done (same form as new) | N-01 |
+| `(tabs)/recipes/new` | none (brand defaults) | Done, with "Contains these allergens" | N-01, #5, #10 |
+| `(tabs)/recipes/edit/[id]` | none (brand defaults) | Done (same form as new) | N-01, #10 |
 | recipe detail | `04-recipe-detail.png` | **Not built** (no route) | N-01, #8 |
 | `(tabs)/meal-planner/index` (week) | `02-meal-planner-week-filled.png` | Done, minus photos, swap and expand | #4, #17, N-05 |
 | `(tabs)/meal-planner/index` (month) | none (brand defaults) | Done | #4 |

@@ -36,6 +36,7 @@ const full = recipeSchema.parse({
   ],
   steps: ["Heat the cream.", "Bake in a water bath."],
   dietTags: ["vegetarian", "gluten_free"],
+  allergens: ["milk", "eggs"],
   notes: "Torch just before serving",
 });
 
@@ -65,6 +66,7 @@ describe("toRecipeForm (N-01 edit)", () => {
         { key: expect.any(String), text: "Cook" },
       ],
       dietTags: [],
+      allergens: [],
       notes: "",
     });
   });
@@ -105,6 +107,13 @@ describe("toRecipeForm (N-01 edit)", () => {
     const form = toRecipeForm(full);
     expect(form.mealTypes).not.toBe(full.mealTypes);
     expect(form.dietTags).not.toBe(full.dietTags);
+    expect(form.allergens).not.toBe(full.allergens);
+  });
+
+  it("carries the allergens the author marked (#10), and a new form starts with none", () => {
+    expect(toRecipeForm(full).allergens).toEqual(["milk", "eggs"]);
+    expect(emptyRecipeForm().allergens).toEqual([]);
+    expect(save({ ...toRecipeForm(full), allergens: ["wheat", "milk"] }).allergens).toEqual(["milk", "wheat"]);
   });
 
   it("never shortens a saved value, even past the box's usual limit", () => {
@@ -245,7 +254,12 @@ describe("isRecipeFormChanged", () => {
   });
 
   it("is false when tags are picked again in another order", () => {
-    const reordered = { ...initial, mealTypes: [...initial.mealTypes].reverse(), dietTags: [...initial.dietTags].reverse() };
+    const reordered = {
+      ...initial,
+      mealTypes: [...initial.mealTypes].reverse(),
+      dietTags: [...initial.dietTags].reverse(),
+      allergens: [...initial.allergens].reverse(),
+    };
     expect(isRecipeFormChanged(initial, reordered)).toBe(false);
   });
 
@@ -270,6 +284,8 @@ describe("isRecipeFormChanged", () => {
     ["steps (one removed)", (v) => ({ ...v, steps: v.steps.slice(0, 1) })],
     ["diet tags (one added)", (v) => ({ ...v, dietTags: [...v.dietTags, "vegan"] })],
     ["diet tags (one removed)", (v) => ({ ...v, dietTags: ["vegetarian"] })],
+    ["marked allergens (one added)", (v) => ({ ...v, allergens: [...v.allergens, "soy"] })],
+    ["marked allergens (all removed)", (v) => ({ ...v, allergens: [] })],
     ["notes", (v) => ({ ...v, notes: "Serve cold" })],
   ])("is true when the %s changes", (_label, change) => {
     expect(isRecipeFormChanged(initial, change(initial))).toBe(true);

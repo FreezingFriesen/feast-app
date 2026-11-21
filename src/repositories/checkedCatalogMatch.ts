@@ -47,9 +47,12 @@ export function findCheckedMatch(
     const found: unknown = catalog.find({ ingredientId: row.ingredientId, name: row.name });
     if (found === undefined) return undefined;
     // Object.isFrozen is true for primitives, and they can't be WeakMap keys.
-    if (typeof found !== "object" || found === null || !isFrozenMatch(found)) return check(found);
+    if (typeof found !== "object" || found === null) return check(found);
+    // Only frozen matches are ever cached, and frozen stays frozen, so a hit needs no
+    // second look (this is the path tens of thousands of rows take).
     const cached = checkedMatches.get(found);
     if (cached !== undefined) return cached ?? undefined;
+    if (!isFrozenMatch(found)) return check(found);
     const checked = check(found);
     checkedMatches.set(found, checked ?? null);
     return checked;

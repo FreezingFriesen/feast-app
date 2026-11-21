@@ -66,6 +66,14 @@ describe("createAssessmentMemo", () => {
     expect(assess.mock.calls.map(([recipe]) => recipe.id)).toEqual(["pancakes", "stir_fry", "stir_fry"]);
   });
 
+  it("adds the allergens the author marked to what the catalog finds (#10)", () => {
+    const { catalog } = countingCatalog();
+    const marked = makeRecipe("marked", { updatedAt: 1, allergens: ["sesame", "soy"] }, ["Hoisin sauce", "Eggs"]);
+    const assess = createAssessmentMemo().forCatalog(catalog, [marked]);
+    // Marking doesn't make the unmatched row checked.
+    expect(assess(marked)).toMatchObject({ contains: ["eggs", "sesame", "soy"], unmatchedNames: ["Hoisin sauce"], fullyChecked: false });
+  });
+
   it("assesses a recipe it wasn't given on the spot, never with a stale result", () => {
     const { catalog } = countingCatalog();
     const memo = createAssessmentMemo();

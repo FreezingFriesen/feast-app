@@ -20,6 +20,7 @@ export function makeRecipe(id: string, patch: Partial<Recipe> = {}, names: reado
     ingredients: names.map((name) => row(name)),
     steps: ["Cook it."],
     dietTags: [],
+    allergens: [],
     createdAt: Date.UTC(2026, 9, 1),
     updatedAt: Date.UTC(2026, 9, 1),
     schemaVersion: 1,

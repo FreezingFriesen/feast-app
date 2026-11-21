@@ -1,4 +1,4 @@
-import { recipeIdSchema, recipeSchema, storedRecipeSchema } from "../recipeSchema";
+import { ALLERGENS, recipeIdSchema, recipeSchema, storedRecipeSchema } from "../recipeSchema";
 
 const ingredient = { name: "Flour", quantity: 200, unit: "g" };
 
@@ -21,7 +21,7 @@ const parse = (patch: object) => recipeSchema.parse({ ...valid, ...patch });
 
 describe("recipeSchema", () => {
   it("accepts a minimal recipe and fills in empty tag lists", () => {
-    expect(recipeSchema.parse(valid)).toEqual({ ...valid, mealTypes: [], dietTags: [] });
+    expect(recipeSchema.parse(valid)).toEqual({ ...valid, mealTypes: [], dietTags: [], allergens: [] });
   });
 
   it("accepts every optional field", () => {
@@ -33,6 +33,7 @@ describe("recipeSchema", () => {
       mealTypes: ["breakfast"],
       ingredients: [{ ...ingredient, ingredientId: "all_purpose_flour", note: "sifted" }],
       dietTags: ["vegetarian"],
+      allergens: ["milk", "eggs"],
       notes: "Serve warm",
     };
     expect(recipeSchema.parse(full)).toEqual(full);
@@ -193,6 +194,7 @@ describe("storedRecipeSchema", () => {
     ...valid,
     mealTypes: ["dinner"],
     dietTags: [],
+    allergens: [],
     createdAt: Date.UTC(2026, 9, 1),
     updatedAt: Date.UTC(2026, 9, 2),
     schemaVersion: 1,
@@ -243,5 +245,58 @@ describe("storedRecipeSchema", () => {
 
   it("cleans text read back the same way as the form does", () => {
     expect(storedRecipeSchema.parse({ ...stored, title: " Pan​cakes " }).title).toBe("Pancakes");
+  });
+
+  describe("allergens the author marks (#10)", () => {
+    it("a record saved before the field existed reads as none marked", () => {
+      const { allergens: _allergens, ...older } = stored;
+      expect(storedRecipeSchema.parse(older).allergens).toEqual([]);
+    });
+
+    it("keeps every allergen, in vocabulary order", () => {
+      expect(storedRecipeSchema.parse({ ...stored, allergens: ["wheat", "peanuts"] }).allergens).toEqual(["peanuts", "wheat"]);
+      expect(acceptsStored({ ...stored, allergens: [...ALLERGENS] })).toBe(true);
+    });
+
+    // Like the Rules (validChoices): a stored list is refused, never quietly fixed.
+    it.each<[string, unknown]>([
+      ["a repeated allergen", ["milk", "milk"]],
+      ["an allergen that isn't on the list", ["gluten"]],
+      ["null (not 'none marked')", null],
+      ["a single string", "milk"],
+    ])("refuses %s", (_label, allergens) => {
+      expect(acceptsStored({ ...stored, allergens })).toBe(false);
+    });
+  });
+});
+
+describe("recipeSchema: allergens the author marks (#10)", () => {
+  it("defaults to none marked, never to anything else", () => {
+    expect(parse({}).allergens).toEqual([]);
+  });
+
+  it("accepts every allergen, sorted into vocabulary order with repeats removed", () => {
+    expect(parse({ allergens: [...ALLERGENS].reverse() }).allergens).toEqual([...ALLERGENS]);
+    expect(parse({ allergens: ["wheat", "milk", "wheat"] }).allergens).toEqual(["milk", "wheat"]);
+  });
+
+  it.each<unknown>([
+    ...ATTACK_STRINGS,
+    "Milk",
+    "milk ",
+    "gluten",
+    "tree nuts",
+    "",
+    1,
+    null,
+    {},
+  ])("refuses %p as an allergen", (value) => {
+    expect(accepts({ ...valid, allergens: [value] })).toBe(false);
+  });
+
+  it("refuses more items than there are allergens, and anything but a list", () => {
+    expect(accepts({ ...valid, allergens: [...ALLERGENS, "milk"] })).toBe(false);
+    expect(accepts({ ...valid, allergens: "milk" })).toBe(false);
+    expect(accepts({ ...valid, allergens: null })).toBe(false);
   });
 });

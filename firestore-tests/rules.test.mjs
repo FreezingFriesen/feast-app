@@ -303,6 +303,8 @@ describe("usernames", () => {
 const RECIPE = "users/alice/recipes/pancakes-1";
 const ENTRY = "users/alice/mealPlanEntries/entry-1";
 const ATTACKS = ["'; DROP TABLE recipes;--", "<script>alert(1)</script>"];
+// Health Canada's 11, as in recipeSchema.ts (the allergens a recipe's author marks, #10).
+const ALL_ALLERGENS = ["peanuts", "tree_nuts", "milk", "eggs", "fish", "shellfish", "sesame", "soy", "wheat", "mustard", "sulphites"];
 
 function newRecipe(now = Date.now()) {
   return {
@@ -448,6 +450,7 @@ describe("recipes", () => {
     ["50 steps", { steps: Array(50).fill("Stir") }],
     ["empty tag lists", { mealTypes: [], dietTags: [] }],
     ["an empty allergen list", { allergens: [] }],
+    ["every allergen", { allergens: ALL_ALLERGENS }],
   ]) {
     it(`allows ${label}`, async () => {
       await assertSucceeds(setDoc(doc(asUser("alice"), RECIPE), { ...newRecipe(), ...patch }));
@@ -484,6 +487,13 @@ describe("recipes", () => {
     ["a duplicate diet tag", { dietTags: ["vegan", "vegan"] }],
     ["an allergen not on the list", { allergens: ["gluten"] }],
     ["a duplicate allergen", { allergens: ["milk", "milk"] }],
+    ["more than 11 allergens", { allergens: [...ALL_ALLERGENS, "milk"] }],
+    ["an allergen with capitals", { allergens: ["Milk"] }],
+    ["an allergen with a space", { allergens: ["tree nuts"] }],
+    ["a number in the allergen list", { allergens: [1] }],
+    ["allergens that are not a list", { allergens: "milk" }],
+    ["null allergens (not 'none marked')", { allergens: null }],
+    ...ATTACKS.map((attack) => [`the allergen ${attack}`, { allergens: [attack] }]),
     ["schemaVersion 2", { schemaVersion: 2 }],
     ["a createdAt before 2020", { createdAt: Date.UTC(2019, 0, 1) }],
     ["a createdAt far in the future", { createdAt: Date.now() + 86_400_000, updatedAt: Date.now() + 86_400_000 }],

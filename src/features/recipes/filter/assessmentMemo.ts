@@ -16,7 +16,11 @@ export type AssessmentMemo = {
 
 const keyOf = (recipe: Pick<Recipe, "id" | "updatedAt">) => `${recipe.id}|${recipe.updatedAt}`;
 
-export function createAssessmentMemo(assess: Assess = assessRecipeAllergens): AssessmentMemo {
+// The catalog's allergens plus the ones the author marked (#10). Marking more can only add
+// warnings; an empty list subtracts nothing.
+const assessWithMarked: Assess = (recipe, catalog) => assessRecipeAllergens(recipe, catalog, recipe.allergens);
+
+export function createAssessmentMemo(assess: Assess = assessWithMarked): AssessmentMemo {
   let lastCatalog: IngredientCatalog | null = null;
   let cache = new Map<string, AllergenAssessment>();
 
