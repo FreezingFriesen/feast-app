@@ -1,16 +1,14 @@
-import { FormMessage } from "@/components/form/FormMessage";
 import { TextAction } from "@/components/TextAction";
-import { filtersLabel, type RecipeListState } from "@/features/recipes/filter/recipeListState";
-import { colors, spacing, typography } from "@/theme";
+import { filtersLabel } from "@/features/recipes/filter/recipeListState";
+import { spacing } from "@/theme";
 import type { RecipeFilter } from "@/validation/recipeFilterSchema";
-import { StyleSheet, Text, View } from "react-native";
-import { ProfileFilterRow } from "./ProfileFilterRow";
+import { useRouter } from "expo-router";
+import { StyleSheet, View } from "react-native";
+import { ProfileFilterBanners, type ReadyRecipeListState } from "./ProfileFilterBanners";
 import { RecipeFilterPanel } from "./RecipeFilterPanel";
 
-type ReadyState = Extract<RecipeListState, { kind: "ready" }>;
-
 type RecipeListHeaderProps = {
-  state: ReadyState;
+  state: ReadyRecipeListState;
   filters: RecipeFilter;
   onFiltersChange: (next: RecipeFilter) => void;
   onClearFilters: () => void;
@@ -20,10 +18,8 @@ type RecipeListHeaderProps = {
   onTogglePanel: () => void;
 };
 
-// Everything above the recipe list (#10, N-04), in this order: the user's own
-// restrictions, the "filter is off" indicator, a profile that couldn't load, how many
-// recipes the profile hides, the allergen data notice, then Filters. The messages are
-// polite live regions, so screen readers hear them change.
+// Everything above the Recipes tab's list (#10, N-04): the allergy & diet filter banners,
+// then "Filters (n)" and its panel.
 export function RecipeListHeader({
   state,
   filters,
@@ -34,40 +30,21 @@ export function RecipeListHeader({
   panelOpen,
   onTogglePanel,
 }: RecipeListHeaderProps) {
+  const router = useRouter();
   const label = filtersLabel(state.activeFilterCount);
   return (
     <View style={styles.header}>
-      <ProfileFilterRow row={state.profileRow} onChange={onProfileFilterChange} />
-
-      {state.offIndicator ? (
-        <View>
-          <FormMessage tone="info" message={state.offIndicator} />
-          <TextAction label="Turn on" align="start" onPress={() => onProfileFilterChange(true)} accessibilityLabel="Turn on my allergy and diet filter" />
-        </View>
-      ) : null}
-
-      {state.profileError ? (
-        <View>
-          <FormMessage tone="error" message={state.profileError} />
-          {onRetryProfile ? <TextAction label="Retry" align="start" onPress={onRetryProfile} /> : null}
-        </View>
-      ) : null}
-
-      {state.hiddenMessage ? (
-        <View style={styles.hidden}>
-          <Text style={styles.hiddenText} accessibilityLiveRegion="polite">
-            {state.hiddenMessage}
-          </Text>
-          <TextAction
-            label="Show them"
-            align="start"
-            onPress={() => onProfileFilterChange(false)}
-            accessibilityLabel="Show them: turns off my allergy and diet filter"
-          />
-        </View>
-      ) : null}
-
-      {state.dataNotice ? <FormMessage tone="info" message={state.dataNotice} /> : null}
+      <ProfileFilterBanners
+        state={state}
+        onProfileFilterChange={onProfileFilterChange}
+        onRetryProfile={onRetryProfile}
+        links={{
+          // withAnchor puts the Account menu under Allergies & Diets, so Back works even
+          // when the Account tab hasn't been opened yet.
+          openDietary: () => router.navigate("/account/dietary", { withAnchor: true }),
+          openAccount: () => router.navigate("/account"),
+        }}
+      />
 
       <TextAction
         label={`${label} ${panelOpen ? "▴" : "▾"}`}
@@ -90,15 +67,5 @@ export function RecipeListHeader({
 const styles = StyleSheet.create({
   header: {
     marginBottom: spacing.sm,
-  },
-  hidden: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    columnGap: spacing.md,
-  },
-  hiddenText: {
-    ...typography.body,
-    color: colors.text,
   },
 });

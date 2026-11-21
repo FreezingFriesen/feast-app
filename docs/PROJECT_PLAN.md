@@ -60,8 +60,14 @@ repositories and SQLite:
   download the ingredient data from Firestore, then airplane mode and a restart, with the
   profile filter still working from the phone's copy.
 
-#10 and N-04 aren't ticked until it's merged and a person has checked the screen on a
-phone: the switch and "Show them", the row notes, large text, a screen reader, and the
+The meal planner's recipe picker (`meal-planner/pick-recipe`) applies the same allergy &
+diet filter, with the same switch, "filter is off" indicator, hidden count, data notice and
+row notes. It keeps its sections (recipes tagged with the slot's meal type first) and has
+no Filters panel.
+
+#10 and N-04 aren't ticked until it's merged and a person has checked the screens on a
+phone: the switch and "Show them" on the Recipes tab and in the picker, the row notes,
+large text, a screen reader (the picker reads each recipe's notes with its name), and the
 "Set your allergies & diets" link opening with Back. Still to do for N-03: filters by
 ingredient and by high or low protein, fibre, etc. The rules:
 - **Allergens come from the ingredient catalog** on the phone. They're worked out from each
@@ -106,7 +112,8 @@ ingredient and by high or low protein, fibre, etc. The rules:
 
 Status: Month/Week planner UI, assign/move/remove and servings are built
 (#4, #17, N-05). Entries are stored in SQLite and survive a restart (#1).
-N-06 is waiting on ingredient price data.
+The recipe picker filters by the user's allergies and diets by default (#10, N-04; see
+Recipes). N-06 is waiting on ingredient price data.
 
 ### Grocery lists
 - [x] #6 Generate a weekly grocery list from the meal plan
@@ -626,7 +633,13 @@ To be planned.
     an edit, because its schema doesn't know it. Everyone on the team must update before
     marking allergens. No app has been released, so there are no old copies outside the
     team (see "Marked allergens" in Technical decisions).
-  - The meal planner's recipe picker doesn't use the profile filter yet (Phase 4).
+  - The recipe picker's switch is its own: the filter starts on every time the picker
+    opens, even if it's off on the Recipes tab (the safe direction).
+  - The picker is a popup, and switching tabs from a native popup isn't reliable, so its
+    next steps ("Set your allergies & diets", "Log in", "Finish setting up") say "on the
+    Account page" instead of linking there.
+  - The filter is view only: a recipe already in the meal plan, or on the grocery list,
+    stays there even if it contains the user's allergens.
   - "Newest" sorts by `updatedAt`, so it really means "most recently edited".
 - Re-authenticating (e.g. to change password) doesn't restart the 30-day session
   on the device. The planned server-side `auth_time` check would restart it, so

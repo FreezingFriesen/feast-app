@@ -239,13 +239,17 @@ Feature components follow the same tokens:
     (it ignores touches and is hidden from screen readers). Track `inputBorder` when off,
     `action` when on, thumb `surface`. Green "on" is a labelled control state, not an
     allergen signal.
-  - `features/recipes/components/ProfileFilterRow`: "Using your allergies & diets: Milk,
-    Vegan" and the "Filter by my allergies & diets" switch, or a `TextAction` for the next
-    step ("Set your allergies & diets", "Log in to filter …", "Finish setting up …").
-  - `features/recipes/components/RecipeListHeader`: in this order, the profile row, the
+  - `features/recipes/components/ProfileFilterRow` (`row`, `onChange`, `links?`): "Using
+    your allergies & diets: Milk, Vegan" and the "Filter by my allergies & diets" switch,
+    or the next step. With `links`, the next step is a `TextAction` ("Set your allergies &
+    diets", "Log in to filter …", "Finish setting up …"). Without them (inside a modal,
+    where switching tabs isn't reliable), a muted sentence ending "on the Account page".
+  - `features/recipes/components/ProfileFilterBanners`: in this order, the profile row, the
     "filter is off" `FormMessage` (info) with "Turn on", the profile error (error) with
-    Retry, the hidden count (polite live region) with "Show them", the allergen data
-    notice (info), then "Filters (n) ▾".
+    Retry, the hidden count (polite live region) with "Show them", and the allergen data
+    notice (info). Shared by the Recipes tab and the meal planner's recipe picker.
+  - `features/recipes/components/RecipeListHeader`: `ProfileFilterBanners` (with links),
+    then "Filters (n) ▾". Recipes tab only.
   - `features/recipes/components/RecipeFilterPanel`: Diet, "Leave out allergens" and Meal
     `ChipSelect`s, the "Also hide recipes with ingredients Feast couldn't check" switch,
     Sort as a `SegmentedControl` (Newest, A–Z, Quickest) and "Clear filters".
@@ -307,7 +311,7 @@ Feature components follow the same tokens:
 | `(tabs)/meal-planner/index` (week) | `02-meal-planner-week-filled.png` | Done, minus photos, swap and expand | #4, #17, N-05 |
 | `(tabs)/meal-planner/index` (month) | none (brand defaults) | Done | #4 |
 | `(tabs)/meal-planner/day/[date]` | none (brand defaults) | Done | #4, #17 |
-| `(tabs)/meal-planner/pick-recipe` | none (brand defaults) | Done | N-05 |
+| `(tabs)/meal-planner/pick-recipe` | none (brand defaults) | Done; the allergy & diet filter banners (no links, no Filters panel), row notes read out with each recipe's name | N-05, #10, N-04 |
 | `(tabs)/meal-planner/entry/[id]` | none (stepper style from 04) | Done | N-05 |
 | `(tabs)/grocery-list` | `01-grocery-list-filled.png` (not in the repo yet) | Done from this system: week selector, list with checkboxes, "Added by you", inline add form; no cost or aisles | #6, N-07, N-09, N-10 |
 | `(tabs)/account/index` (signed out) | `05-welcome-signed-out.png` | Done, without social login or the photo | N-13, N-14 |
