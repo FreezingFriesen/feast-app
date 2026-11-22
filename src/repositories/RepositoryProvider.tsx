@@ -1,7 +1,13 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { GroceryRepository } from "./GroceryRepository";
-import { emptyIngredientCatalog, type IngredientCatalog } from "./IngredientCatalog";
+import type { IngredientCatalog } from "./IngredientCatalog";
+import {
+  createIngredientCatalogStore,
+  type IngredientCatalogStatus,
+  type IngredientCatalogStore,
+} from "./IngredientCatalogStore";
 import { createInMemoryGroceryRepository } from "./inMemoryGroceryRepository";
+import { createInMemoryIngredientRepository } from "./inMemoryIngredientRepository";
 import { createInMemoryMealPlanRepository } from "./inMemoryMealPlanRepository";
 import { createInMemoryProfileRepository } from "./inMemoryProfileRepository";
 import { createInMemoryRecipeRepository } from "./inMemoryRecipeRepository";
@@ -16,8 +22,9 @@ export type Repositories = {
   profiles: ProfileRepository;
   // The user's grocery list state: check marks and items added by hand (N-10).
   groceries: GroceryRepository;
-  // Ingredient reference data for merging and converting grocery amounts (N-08).
-  ingredientCatalog: IngredientCatalog;
+  // Ingredient reference data for merging and converting grocery amounts (N-08): the copy
+  // downloaded to this phone. Screens read it through useIngredientCatalog().
+  ingredientCatalog: IngredientCatalogStore;
 };
 
 // Shares the repositories with every screen inside RepositoryProvider.
@@ -34,16 +41,19 @@ type RepositoryProviderProps = {
 // useState keeps the same repositories for the life of the app, instead of making new
 // (empty) ones on every re-draw.
 export function RepositoryProvider({ children, repositories }: RepositoryProviderProps) {
-  const [value] = useState<Repositories>(
-    () =>
-      repositories ?? {
-        recipes: createInMemoryRecipeRepository(),
-        mealPlans: createInMemoryMealPlanRepository(),
-        profiles: createInMemoryProfileRepository(),
-        groceries: createInMemoryGroceryRepository(),
-        ingredientCatalog: emptyIngredientCatalog,
-      },
-  );
+  const [value] = useState<Repositories>(() => {
+    if (repositories) return repositories;
+    // Read it straight away, as createAppServices does, so its status doesn't stay "loading".
+    const ingredientCatalog = createIngredientCatalogStore(createInMemoryIngredientRepository());
+    void ingredientCatalog.load();
+    return {
+      recipes: createInMemoryRecipeRepository(),
+      mealPlans: createInMemoryMealPlanRepository(),
+      profiles: createInMemoryProfileRepository(),
+      groceries: createInMemoryGroceryRepository(),
+      ingredientCatalog,
+    };
+  });
   return <RepositoryContext.Provider value={value}>{children}</RepositoryContext.Provider>;
 }
 
@@ -73,6 +83,21 @@ export function useGroceryRepository(): GroceryRepository {
   return useRepositories().groceries;
 }
 
+// The ingredient catalog as a plain, synchronous IngredientCatalog. Re-draws the screen
+// when a copy finishes loading or a new one is downloaded.
 export function useIngredientCatalog(): IngredientCatalog {
-  return useRepositories().ingredientCatalog;
+  const store = useRepositories().ingredientCatalog;
+  return useSyncExternalStore(store.subscribe, store.getSnapshot);
+}
+
+// Whether the ingredient catalog is still loading, empty or ready (IngredientCatalogStatus).
+export function useIngredientCatalogStatus(): IngredientCatalogStatus {
+  const store = useRepositories().ingredientCatalog;
+  return useSyncExternalStore(store.subscribe, store.getStatus);
+}
+
+// When the ingredient data on this phone was downloaded, or null if there is none.
+export function useIngredientDataUpdatedAt(): number | null {
+  const store = useRepositories().ingredientCatalog;
+  return useSyncExternalStore(store.subscribe, store.getUpdatedAt);
 }

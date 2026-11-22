@@ -1,6 +1,7 @@
 import { domainError } from "@/services/domainErrors";
 import type { SqlDatabase, SqlValue } from "@/storage/SqlDatabase";
 import {
+  ALLERGENS,
   DIET_TAGS,
   MAX_INGREDIENT_FIELD_LENGTH,
   MAX_INGREDIENTS,
@@ -23,7 +24,7 @@ import {
 } from "./records";
 import { isPendingLimit, type PendingRecord } from "./Syncable";
 
-// One row of the recipes table, as SQLite returns it. The four lists are JSON text;
+// One row of the recipes table, as SQLite returns it. The five lists are JSON text;
 // NULL means an optional field is not set.
 type RecipeRow = {
   id: string;
@@ -36,6 +37,7 @@ type RecipeRow = {
   ingredients: string;
   steps: string;
   diet_tags: string;
+  allergens: string;
   notes: string | null;
   created_at: number;
   updated_at: number;
@@ -46,23 +48,24 @@ type RecipeRow = {
 // Constant SQL only; every value is a "?" parameter. Ties are broken by rowid (the order
 // the rows were first added), the same order the in-memory version keeps.
 const SELECT_LIVE_BY_ID = `SELECT id, title, description, servings, prep_time_minutes, cook_time_minutes,
-    meal_types, ingredients, steps, diet_tags, notes, created_at, updated_at, deleted_at, schema_version
+    meal_types, ingredients, steps, diet_tags, allergens, notes, created_at, updated_at, deleted_at, schema_version
   FROM recipes WHERE id = ? AND deleted_at IS NULL`;
 const SELECT_LIVE = `SELECT id, title, description, servings, prep_time_minutes, cook_time_minutes,
-    meal_types, ingredients, steps, diet_tags, notes, created_at, updated_at, deleted_at, schema_version
+    meal_types, ingredients, steps, diet_tags, allergens, notes, created_at, updated_at, deleted_at, schema_version
   FROM recipes WHERE deleted_at IS NULL ORDER BY updated_at DESC, rowid`;
 const SELECT_PENDING = `SELECT id, title, description, servings, prep_time_minutes, cook_time_minutes,
-    meal_types, ingredients, steps, diet_tags, notes, created_at, updated_at, deleted_at, schema_version
+    meal_types, ingredients, steps, diet_tags, allergens, notes, created_at, updated_at, deleted_at, schema_version
   FROM recipes WHERE dirty = 1 AND (updated_at > ? OR (updated_at = ? AND id > ?))
   ORDER BY updated_at, id LIMIT ?`;
 const COUNT_PENDING = "SELECT COUNT(*) AS count FROM recipes WHERE dirty = 1";
 const INSERT_LOCAL = `INSERT INTO recipes (title, description, servings, prep_time_minutes, cook_time_minutes,
-    meal_types, ingredients, steps, diet_tags, notes, id, created_at, updated_at, deleted_at, schema_version, dirty)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`;
+    meal_types, ingredients, steps, diet_tags, allergens, notes, id, created_at, updated_at, deleted_at, schema_version, dirty)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 1)`;
 // Only if the row is still the one that was read (same updated_at), so a download that
 // landed in between is never overwritten by an edit made from the older copy.
 const UPDATE_IF_UNCHANGED = `UPDATE recipes SET title = ?, description = ?, servings = ?, prep_time_minutes = ?,
-    cook_time_minutes = ?, meal_types = ?, ingredients = ?, steps = ?, diet_tags = ?, notes = ?, updated_at = ?, dirty = 1
+    cook_time_minutes = ?, meal_types = ?, ingredients = ?, steps = ?, diet_tags = ?, allergens = ?, notes = ?,
+    updated_at = ?, dirty = 1
   WHERE id = ? AND deleted_at IS NULL AND updated_at = ?`;
 const REMOVE_IF_UNCHANGED = `UPDATE recipes SET deleted_at = ?, updated_at = ?, dirty = 1
   WHERE id = ? AND deleted_at IS NULL AND updated_at = ?`;
@@ -72,8 +75,8 @@ const MARK_SYNCED = "UPDATE recipes SET dirty = 0 WHERE id = ? AND updated_at = 
 // live row however old it is, a live copy never replaces a deleted row, and otherwise the
 // newer copy wins. Downloaded rows have nothing to upload (dirty = 0).
 const UPSERT_IF_NEWER = `INSERT INTO recipes (title, description, servings, prep_time_minutes, cook_time_minutes,
-    meal_types, ingredients, steps, diet_tags, notes, id, created_at, updated_at, deleted_at, schema_version, dirty)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    meal_types, ingredients, steps, diet_tags, allergens, notes, id, created_at, updated_at, deleted_at, schema_version, dirty)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
   ON CONFLICT(id) DO UPDATE SET
     title = excluded.title,
     description = excluded.description,
@@ -84,6 +87,7 @@ const UPSERT_IF_NEWER = `INSERT INTO recipes (title, description, servings, prep
     ingredients = excluded.ingredients,
     steps = excluded.steps,
     diet_tags = excluded.diet_tags,
+    allergens = excluded.allergens,
     notes = excluded.notes,
     created_at = excluded.created_at,
     updated_at = excluded.updated_at,
@@ -103,6 +107,7 @@ const MAX_INGREDIENTS_JSON = jsonCap(MAX_INGREDIENTS, 3 * MAX_INGREDIENT_FIELD_L
 const MAX_STEPS_JSON = jsonCap(MAX_STEPS, MAX_STEP_LENGTH);
 const MAX_MEAL_TYPES_JSON = jsonCap(MEAL_TYPES.length, 0);
 const MAX_DIET_TAGS_JSON = jsonCap(DIET_TAGS.length, 0);
+const MAX_ALLERGENS_JSON = jsonCap(ALLERGENS.length, 0);
 
 // How many times an edit is tried when a download changes the row between reading and
 // writing it. More than one retry in a row is very unlikely.
@@ -133,6 +138,10 @@ function toRecord(row: RecipeRow | null): PendingRecord<StoredRecipe> | undefine
       ingredients: parseJson(row.ingredients, MAX_INGREDIENTS_JSON),
       steps: parseJson(row.steps, MAX_STEPS_JSON),
       dietTags: parseJson(row.diet_tags, MAX_DIET_TAGS_JSON),
+      // The column always holds a list (migration 7 fills '[]'), so unreadable text fails the
+      // check (null) instead of falling back to the schema's default: a damaged list of
+      // marked allergens must never read as "none marked".
+      allergens: parseJson(row.allergens, MAX_ALLERGENS_JSON) ?? null,
       notes: row.notes ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -163,6 +172,7 @@ const recipeColumns = (data: StoredRecipe): SqlValue[] => [
   JSON.stringify(data.ingredients),
   JSON.stringify(data.steps),
   JSON.stringify(data.dietTags),
+  JSON.stringify(data.allergens),
   data.notes ?? null,
 ];
 

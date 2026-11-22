@@ -1,20 +1,26 @@
-// The Recipes tab: a list of the user's saved recipes (#1, N-01).
+// The Recipes tab: the user's saved recipes (#1, N-01), filtered and sorted by diet,
+// allergens and meal type (#10, N-04, part of N-03). The user's own allergies and diets
+// apply by default; see src/features/recipes/filter/ for the rules.
 import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { EmptyState } from "@/components/EmptyState";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { HeaderTextButton } from "@/components/HeaderTextButton";
-import { useRecipes } from "@/features/recipes/useRecipes";
+import { useFilteredRecipes } from "@/features/recipes/useFilteredRecipes";
 import { borderWidth, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import { Link, Stack, useRouter } from "expo-router";
+import { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-// This screen displays a list of recipes and allows the user to navigate to the "New Recipe" screen.
+// This screen displays the list of recipes and allows the user to navigate to the "New Recipe" screen.
 export default function RecipesScreen() {
   const router = useRouter();
-  // All saved recipes, newest first. The list updates by itself when a recipe is added.
-  const recipes = useRecipes();
+  // The recipes to show (newest first by default) and everything around them. The list
+  // updates by itself when a recipe is added or the ingredient data arrives.
+  const list = useFilteredRecipes();
+  // Whether the Filters panel is open. In memory only, like the filters.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const { state } = list;
 
-  // Render the list of recipes or a message indicating that there are no recipes yet.
   return (
     <>
       {/* Add a header button to navigate to the "New Recipe" screen. */}
@@ -55,7 +61,6 @@ export default function RecipesScreen() {
               </Text>
             </View>
             <Pressable
-              testID="edit-recipe-button"
               onPress={() => router.push({ pathname: "/recipes/edit/[id]", params: { id: item.id } })}
               accessibilityRole="button"
               accessibilityLabel={`Edit ${item.title}`}
@@ -73,11 +78,17 @@ export default function RecipesScreen() {
 // White cards with a thin edge, as in the mockups. No shadows on list rows, so
 // scrolling stays fast.
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+  },
   list: {
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  emptyContainer: {
+  grow: {
     flexGrow: 1,
   },
   item: {
@@ -112,5 +123,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginVertical: -spacing.sm,
     marginRight: -spacing.sm,
+  },
+  emptyActions: {
+    alignSelf: "stretch",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
 });

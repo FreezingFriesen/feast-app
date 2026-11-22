@@ -1,0 +1,27 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "demo": {
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_BACKEND": "firebase"
+      },
+      "autoIncrement": true,
+      "android": {
+        "distribution": "internal",
+        "buildType": "apk"
+      },
+      "ios": {
+        "distribution": "store"
+      }
+    }
+  },
+  "submit": {
+    "demo": {
+      "ios": {}
+    }
+  }
+}

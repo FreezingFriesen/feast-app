@@ -1,6 +1,6 @@
 import type { RecipeData, RecipeUpdateResult } from "@/repositories/RecipeRepository";
 import { cleanText } from "@/validation/clean";
-import type { DIET_TAGS, MEAL_TYPES, UNITS } from "@/validation/recipeSchema";
+import type { ALLERGENS, DIET_TAGS, MEAL_TYPES, UNITS } from "@/validation/recipeSchema";
 import type { z } from "zod";
 
 // Form state is kept as text, exactly as typed. It is converted with
@@ -34,6 +34,8 @@ export type RecipeFormValues = {
   ingredients: IngredientFormRow[];
   steps: { key: string; text: string }[];
   dietTags: (typeof DIET_TAGS)[number][];
+  // Allergens the author says the recipe contains (#10). Empty means "none marked".
+  allergens: (typeof ALLERGENS)[number][];
   notes: string;
 };
 
@@ -71,6 +73,7 @@ export function emptyRecipeForm(): RecipeFormValues {
     ingredients: [emptyIngredientRow()],
     steps: [emptyStepRow()],
     dietTags: [],
+    allergens: [],
     notes: "",
   };
 }
@@ -102,6 +105,7 @@ export function toRecipeForm(recipe: RecipeData): RecipeFormValues {
     })),
     steps: recipe.steps.map((text) => ({ key: newRowKey(), text })),
     dietTags: [...recipe.dietTags],
+    allergens: [...recipe.allergens],
     notes: recipe.notes ?? "",
   };
 }
@@ -148,6 +152,7 @@ export function toRecipeInput(values: RecipeFormValues): unknown {
     })),
     steps: values.steps.map((step) => step.text),
     dietTags: values.dietTags,
+    allergens: values.allergens,
     notes: toOptionalText(values.notes),
   };
 }
@@ -182,6 +187,7 @@ export function isRecipeFormChanged(initial: RecipeFormValues, current: RecipeFo
     initial.notes === current.notes &&
     sameChoices(initial.mealTypes, current.mealTypes) &&
     sameChoices(initial.dietTags, current.dietTags) &&
+    sameChoices(initial.allergens, current.allergens) &&
     initial.ingredients.length === current.ingredients.length &&
     initial.ingredients.every((row, index) => sameIngredient(row, current.ingredients[index])) &&
     initial.steps.length === current.steps.length &&

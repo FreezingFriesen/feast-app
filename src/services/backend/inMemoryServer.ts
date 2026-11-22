@@ -22,7 +22,8 @@ export type InMemoryOperation =
   | "content.deleteAll"
   | "content.fetch"
   | "content.write"
-  | "content.count";
+  | "content.count"
+  | "ingredients.list";
 
 // Firebase-like limits the fake also enforces.
 // A sensitive change needs a login in the last 5 minutes; 5 wrong passwords lock

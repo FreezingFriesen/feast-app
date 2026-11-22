@@ -5,6 +5,7 @@
 import { parse } from "csv-parse/sync";
 import { realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import { findNameCollisions } from "../src/repositories/ingredientCatalogIndex";
 import { ingredientSchema, ingredientWarnings, type Ingredient } from "../src/validation/ingredientSchema";
 
 const NUMBER_COLUMNS = new Set([
@@ -201,6 +202,12 @@ export function formatImportReport(check: ImportCheck): string {
   const unreviewed = check.ready.filter((ingredient) => !ingredient.allergensReviewed).length;
   if (unreviewed > 0) {
     lines.push(`  NOTE ${unreviewed} valid rows aren't marked allergens_reviewed = TRUE, so the app must show "allergens unknown" for them.`);
+  }
+  // The app matches recipe rows by exact name or alias, and a name that belongs to more
+  // than one ingredient matches none of them. Listed so the data can be fixed; nothing is
+  // changed here.
+  for (const { key, ids } of findNameCollisions(check.ready)) {
+    lines.push(`  NOTE "${key}" is a name or alias of ${ids.join(", ")}, so the app matches it to none of them.`);
   }
   return lines.join("\n");
 }

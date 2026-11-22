@@ -1,6 +1,8 @@
 import { domainError } from "@/services/domainErrors";
 
-// Removes the signed-in user's data from this device (logout, account deletion).
+// Removes the signed-in user's data from this device (logout, account deletion). The
+// ingredient catalog is deliberately not one of the stores: it's shared reference data,
+// the same for every user, not personal data (see createAppServices).
 export type LocalDataWiper = {
   wipe(): Promise<void>;
 };

@@ -1,6 +1,7 @@
 import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { borderWidth, CHIP_HEIGHT, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { formatOptionLabel } from "./formatOptionLabel";
 
 type ChipSelectProps<T extends string> = {
   // Every chip, in the order shown.
@@ -13,11 +14,9 @@ type ChipSelectProps<T extends string> = {
   formatLabel?: (value: T) => string;
 };
 
-// "keto_friendly" -> "Keto friendly"
-export function formatOptionLabel(value: string): string {
-  const spaced = value.replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
+// "keto_friendly" -> "Keto friendly". Lives in its own plain module; re-exported here so
+// existing imports keep working.
+export { formatOptionLabel };
 
 // A row of tappable chips, one per option, with the selected ones highlighted.
 // Tapping a chip calls onToggle; the screen decides what's selected, so it works for

@@ -1,21 +1,26 @@
 // Choose a recipe to add to one meal slot (date + Breakfast/Lunch/Dinner).
-// Recipes tagged with the slot's meal type are listed first.
+// Recipes tagged with the slot's meal type are listed first. The user's allergies and
+// diets filter the list by default, as on the Recipes tab (#10, N-04).
 import { EmptyState } from "@/components/EmptyState";
-import { formatOptionLabel } from "@/components/form/ChipSelect";
+import { formatOptionLabel } from "@/components/form/formatOptionLabel";
 import { FieldError } from "@/components/form/FormField";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { PlaceholderScreen } from "@/components/PlaceholderScreen";
 import { formatServings } from "@/features/meal-planner/components/DaySlots";
 import { formatDay, type DateKey } from "@/features/meal-planner/dates";
+import { pickRecipeSections, pickRowAccessibilityLabel } from "@/features/meal-planner/pickRecipeSections";
 import { writeErrorMessage } from "@/features/meal-planner/writeErrorMessage";
-import { useRecipes } from "@/features/recipes/useRecipes";
+import { ProfileFilterBanners } from "@/features/recipes/components/ProfileFilterBanners";
+import { RecipeRowNotes } from "@/features/recipes/components/RecipeRowNotes";
+import type { RecipeRowView } from "@/features/recipes/filter/recipeListState";
+import { useFilteredRecipes } from "@/features/recipes/useFilteredRecipes";
 import type { Recipe } from "@/repositories/RecipeRepository";
 import { useMealPlanRepository } from "@/repositories/RepositoryProvider";
 import { borderWidth, colors, radius, spacing, typography } from "@/theme";
 import { plannerSlotParamsSchema, type PlannerMealType } from "@/validation/mealPlanSchema";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, SectionList, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 
 // The date and meal type come from the link that opened this screen. If either one
 // isn't valid, show a "not found" message instead of the picker.
@@ -32,21 +37,15 @@ export default function PickRecipeScreen() {
 function RecipePicker({ date, mealType }: { date: DateKey; mealType: PlannerMealType }) {
   const router = useRouter();
   const mealPlans = useMealPlanRepository();
-  const recipes = useRecipes();
+  // The recipes the user's allergy & diet filter leaves, with their notes. The filter
+  // starts on every time the picker opens, whatever the Recipes tab is set to.
+  const list = useFilteredRecipes();
   const [error, setError] = useState<string | null>(null);
   // True while the meal is being added, so a second recipe can't be tapped meanwhile.
   const [saving, setSaving] = useState(false);
   // "breakfast" -> "Breakfast", for the title and section headings.
   const label = formatOptionLabel(mealType);
-
-  // Split the recipes into two groups: those tagged with this slot's meal type, and the
-  // rest. A group with no recipes in it is left out, so no empty heading is shown.
-  const tagged = recipes.filter((recipe) => recipe.mealTypes.includes(mealType));
-  const others = recipes.filter((recipe) => !recipe.mealTypes.includes(mealType));
-  const sections = [
-    { title: `Tagged ${label}`, data: tagged },
-    { title: tagged.length > 0 ? "Other recipes" : "All recipes", data: others },
-  ].filter((section) => section.data.length > 0);
+  const { state } = list;
 
   // Adds the recipe at its own serving size; the user can change it afterwards.
   // The plan stores only the recipe's ID, not a copy of the recipe. On success, close
@@ -71,57 +70,105 @@ function RecipePicker({ date, mealType }: { date: DateKey; mealType: PlannerMeal
     }
   }
 
+  // Recipes tagged with this slot's meal type, then the rest (pickRecipeSections).
+  const sections = state.kind === "ready" ? pickRecipeSections(state.rows, mealType) : [];
+
   return (
     <>
       {/* The header title names the slot, e.g. "Dinner · Tue, Nov 3". */}
       <Stack.Screen options={{ title: `${label} · ${formatDay(date)}` }} />
-      {/* SectionList is a list with headings, which scroll away with the list (not
-          sticky). Each recipe is a button that adds it to the slot. */}
-      <SectionList
-        sections={sections}
-        keyExtractor={(recipe) => recipe.id}
-        contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.list}
-        stickySectionHeadersEnabled={false}
-        // An error (e.g. the slot is full) is shown at the top of the list.
-        ListHeaderComponent={error ? <FieldError message={error} /> : null}
-        // Shown when the user has no recipes at all.
-        ListEmptyComponent={
-          <EmptyState
-            icon="book-outline"
-            title="No recipes yet"
-            description="Create a recipe, then add it to your plan."
-          >
-            {/* navigate is what a Link does, so this behaves like the link it replaces. */}
-            <SubmitButton label="Create a recipe" onPress={() => router.navigate("/recipes/new")} />
-          </EmptyState>
-        }
-        renderSectionHeader={({ section }) => (
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-        )}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => handlePick(item)}
-            disabled={saving}
-            accessibilityRole="button"
-            accessibilityLabel={`Add ${item.title}`}
-            style={[styles.item, saving && styles.itemDisabled]}
-          >
-            <Text style={styles.itemTitle}>{item.title}</Text>
-            <Text style={styles.itemMeta}>{formatServings(item.servings)}</Text>
-          </Pressable>
-        )}
-      />
+      {state.kind === "loading" ? (
+        // Until the recipes, the profile and the ingredient data have loaded: never an
+        // unfiltered list that looks filtered.
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.action} accessibilityLabel="Loading your recipes" />
+        </View>
+      ) : (
+        // SectionList is a list with headings, which scroll away with the list (not
+        // sticky). Each recipe is a button that adds it to the slot.
+        <SectionList
+          sections={sections}
+          keyExtractor={(row) => row.recipe.id}
+          contentContainerStyle={[styles.list, sections.length === 0 && styles.grow]}
+          stickySectionHeadersEnabled={false}
+          // The allergy & diet filter (no links here: this is a popup, and switching tabs
+          // from one isn't reliable), then any error (e.g. the slot is full).
+          ListHeaderComponent={
+            <View>
+              {state.showHeader ? (
+                <ProfileFilterBanners
+                  state={state}
+                  onProfileFilterChange={list.setProfileFilterOn}
+                  onRetryProfile={list.retryProfile}
+                />
+              ) : null}
+              {error ? <FieldError message={error} /> : null}
+            </View>
+          }
+          ListEmptyComponent={
+            state.empty?.kind === "no_matches" ? (
+              // Recipes exist, but the allergy & diet filter hides them all.
+              <EmptyState
+                icon="funnel-outline"
+                title="No recipes match your allergies & diets"
+                description="Your allergy & diet filter hides every recipe."
+              >
+                {state.empty.canTurnOffProfile ? (
+                  <SubmitButton
+                    label="Turn off my allergy & diet filter"
+                    variant="secondary"
+                    onPress={() => list.setProfileFilterOn(false)}
+                  />
+                ) : null}
+              </EmptyState>
+            ) : (
+              // The user has no recipes at all.
+              <EmptyState icon="book-outline" title="No recipes yet" description="Create a recipe, then add it to your plan.">
+                {/* navigate is what a Link does, so this behaves like the link it replaces. */}
+                <SubmitButton label="Create a recipe" onPress={() => router.navigate("/recipes/new")} />
+              </EmptyState>
+            )
+          }
+          renderSectionHeader={({ section }) => <Text style={styles.sectionTitle}>{section.title}</Text>}
+          renderItem={({ item }) => <PickRow row={item} disabled={saving} onPick={() => handlePick(item.recipe)} />}
+        />
+      )}
     </>
+  );
+}
+
+// One recipe: its title, servings and any allergen or diet notes. The label read out
+// includes the notes, because the whole row is one button.
+function PickRow({ row, disabled, onPick }: { row: RecipeRowView; disabled: boolean; onPick: () => void }) {
+  return (
+    <Pressable
+      onPress={onPick}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      accessibilityLabel={pickRowAccessibilityLabel(row)}
+      style={[styles.item, disabled && styles.itemDisabled]}
+    >
+      <Text style={styles.itemTitle}>{row.recipe.title}</Text>
+      <Text style={styles.itemMeta}>{formatServings(row.recipe.servings)}</Text>
+      <RecipeRowNotes notes={row.notes} />
+    </Pressable>
   );
 }
 
 // White cards with a thin edge, under small capital headings.
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+  },
   list: {
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  emptyContainer: {
+  grow: {
     flexGrow: 1,
   },
   sectionTitle: {

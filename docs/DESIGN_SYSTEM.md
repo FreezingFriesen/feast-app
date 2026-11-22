@@ -58,7 +58,7 @@ Code uses `colors.<role>` from `src/theme` and **never** the swatches (`brand.*`
 | `highlight` | yellow | Fills, or text and icons **on green only** | green | 5.37 |
 | `inputBorder` | control grey | Text box and chip edges (needs 3:1) | white, cream | 4.54 / 4.14 |
 | `error` | red | Error text, error borders, the destructive button | white | 5.62 |
-| `errorText` / `errorBackground` | red dark / tint | Error message box | — | 7.87 |
+| `errorText` / `errorBackground` | red dark / tint | Error message box; `errorText` alone for allergen and diet warnings on recipe cards | `errorText` on its tint, or on white | 7.87 / 9.00 |
 | `onDestructive` | white | Destructive button label | red | 5.62 |
 | `success` / `successBackground` | green / green tint | Success message box | — | 5.77 |
 | `info` / `infoBackground` | orange / yellow tint | Info message box (orange is its edge only; text is ink) | — | 15.12 (ink) |
@@ -74,7 +74,9 @@ Also defined:
 - `welcomeGradient`: green into orange, behind the logo on the welcome screen.
 
 `contrastPairs` in `colors.ts` lists every pair the app draws. `contrast.test.ts` fails
-if any pair is below 4.5:1 for text or 3:1 for UI graphics.
+if any pair is below 4.5:1 for text or 3:1 for UI graphics. The recipe filter (#10, N-04)
+added pairs only, no colours: `errorText` on white (row warnings), the white switch thumb
+on the green and grey tracks, and the grey track on white.
 
 ## Contrast: do and don't
 
@@ -203,7 +205,7 @@ unless noted.
 | `form/FormField` + `FieldError` | TextInput props + `label?`, `error?` | White box, `inputBorder`, radius 12, at least 48 tall. Red edge and message on error | Uses the label as `accessibilityLabel` |
 | `form/FormMessage` | `tone: error \| info \| success`, `message` | Each tone has an icon and a tinted box | Error is an alert; all are polite live regions |
 | `form/SubmitButton` | `label`, `busyLabel?`, `busy?`, `disabled?`, `variant` | primary (green), secondary (white, green edge), destructive (red). Spinner while busy, faded when inactive | button with disabled and busy state |
-| `form/ChipSelect` | `options`, `selected`, `onToggle`, `formatLabel?` | `inputBorder` edge. Selected: green with a ✓ | button with selected state |
+| `form/ChipSelect` | `options`, `selected`, `onToggle`, `formatLabel?` (defaults to `formatOptionLabel`, a plain module in `form/formatOptionLabel.ts` that pure code can use too) | `inputBorder` edge. Selected: green with a ✓ | button with selected state |
 | `SegmentedControl` | `options`, `value`, `onChange` | Cream track, white selected pill with bold green text | tablist / tab with selected state |
 | `TextAction` | `label`, `onPress`, `disabled?`, `tone`, `align?: center \| start`, `accessibilityLabel?` | Green text, or red for destructive | button with disabled state, hitSlop to 44pt |
 | `features/account/components/AccountSection` | `title`, `children` | White card with a green group heading | Title is a header |
@@ -219,10 +221,44 @@ Feature components follow the same tokens:
 - `features/recipes/components/RecipeForm`: the recipe form shared by New Recipe and
   Edit Recipe (text boxes, chips, ingredient cards, steps). It takes `initialValues`,
   the button labels and `onSubmit`, and never saves anything itself. On edit, the save
-  button stays disabled until something changes.
+  button stays disabled until something changes. After Diet tags, "Contains these
+  allergens" (#10): a `ChipSelect` of the 11 allergens under a muted `caption` line, "Mark
+  anything this recipe contains. Leaving this empty doesn't mean the recipe is free of
+  allergens." Selected chips use the usual green with a ✓, as on Allergies & Diets: they
+  show a choice, never "safe".
 - Recipe list rows (`recipes/index`): border-only cards with a trailing edit button
   (green pencil, 44pt, labelled "Edit <title>"). Only the button opens the editor;
-  tapping the row itself is kept for the detail screen.
+  tapping the row itself is kept for the detail screen. Allergen and diet notes sit under
+  the meta line (`RecipeRowNotes`, below).
+- The recipe filter (#10, N-04). **No mockup shows a filter UI**, so it's built from the
+  shared parts. **Allergen states never use green or a ✓**, and nothing says "safe": the
+  absence of a warning is the only positive signal.
+  - `features/recipes/components/LabeledSwitch`: a label (and optional muted caption)
+    with a React Native `Switch`. The whole row is one 44pt `Pressable` with
+    `accessibilityRole` "switch" and `checked` state. The `Switch` only shows the state
+    (it ignores touches and is hidden from screen readers). Track `inputBorder` when off,
+    `action` when on, thumb `surface`. Green "on" is a labelled control state, not an
+    allergen signal.
+  - `features/recipes/components/ProfileFilterRow` (`row`, `onChange`, `links?`): "Using
+    your allergies & diets: Milk, Vegan" and the "Filter by my allergies & diets" switch,
+    or the next step. With `links`, the next step is a `TextAction` ("Set your allergies &
+    diets", "Log in to filter …", "Finish setting up …"). Without them (inside a modal,
+    where switching tabs isn't reliable), a muted sentence ending "on the Account page".
+  - `features/recipes/components/ProfileFilterBanners`: in this order, the profile row, the
+    "filter is off" `FormMessage` (info) with "Turn on", the profile error (error) with
+    Retry, the hidden count (polite live region) with "Show them", and the allergen data
+    notice (info). Shared by the Recipes tab and the meal planner's recipe picker.
+  - `features/recipes/components/RecipeListHeader`: `ProfileFilterBanners` (with links),
+    then "Filters (n) ▾". Recipes tab only.
+  - `features/recipes/components/RecipeFilterPanel`: Diet, "Leave out allergens" and Meal
+    `ChipSelect`s, the "Also hide recipes with ingredients Feast couldn't check" switch,
+    Sort as a `SegmentedControl` (Newest, A–Z, Quickest) and "Clear filters".
+  - `features/recipes/components/RecipeRowNotes`: each note is a `DecorativeIcon` plus
+    `caption` text. "Contains: …" (warning icon) and "Tagged Vegan, but contains Milk"
+    (alert icon) are `errorText` on white; "Couldn't check: …" (help icon) is `text`.
+  - Empty states: "No recipes yet" (no recipes at all, no header) and "No recipes match
+    your filters" (funnel icon) with secondary "Clear filters" and "Turn off my allergy &
+    diet filter" buttons, whichever applies.
 - `features/grocery/components/WeekSelector`: 44pt previous and next chevrons in `text`
   (faded and disabled at the planner's date limits), the week's dates as a `heading`,
   "This week" as a muted caption, and a "Back to this week" `TextAction` once the user
@@ -268,14 +304,14 @@ Feature components follow the same tokens:
 
 | Route | Mockup | Status | Plan IDs |
 |---|---|---|---|
-| `(tabs)/recipes/index` | none (brand defaults) | Done; each row has an edit button | #1, N-01 |
-| `(tabs)/recipes/new` | none (brand defaults) | Done | N-01, #5 |
-| `(tabs)/recipes/edit/[id]` | none (brand defaults) | Done (same form as new) | N-01 |
+| `(tabs)/recipes/index` | none (brand defaults; no mockup has a filter UI) | Done; each row has an edit button; profile filter, Filters panel, sort and allergen notes | #1, N-01, #10, N-04, N-03 (part) |
+| `(tabs)/recipes/new` | none (brand defaults) | Done, with "Contains these allergens" | N-01, #5, #10 |
+| `(tabs)/recipes/edit/[id]` | none (brand defaults) | Done (same form as new) | N-01, #10 |
 | recipe detail | `04-recipe-detail.png` | **Not built** (no route) | N-01, #8 |
 | `(tabs)/meal-planner/index` (week) | `02-meal-planner-week-filled.png` | Done, minus photos, swap and expand | #4, #17, N-05 |
 | `(tabs)/meal-planner/index` (month) | none (brand defaults) | Done | #4 |
 | `(tabs)/meal-planner/day/[date]` | none (brand defaults) | Done | #4, #17 |
-| `(tabs)/meal-planner/pick-recipe` | none (brand defaults) | Done | N-05 |
+| `(tabs)/meal-planner/pick-recipe` | none (brand defaults) | Done; the allergy & diet filter banners (no links, no Filters panel), row notes read out with each recipe's name | N-05, #10, N-04 |
 | `(tabs)/meal-planner/entry/[id]` | none (stepper style from 04) | Done | N-05 |
 | `(tabs)/grocery-list` | `01-grocery-list-filled.png` (not in the repo yet) | Done from this system: week selector, list with checkboxes, "Added by you", inline add form; no cost or aisles | #6, N-07, N-09, N-10 |
 | `(tabs)/account/index` (signed out) | `05-welcome-signed-out.png` | Done, without social login or the photo | N-13, N-14 |

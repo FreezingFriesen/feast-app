@@ -1,5 +1,6 @@
-// The recipe form, shared by the New Recipe and Edit Recipe screens (N-01, #5): title,
-// description, servings, times, meal types, ingredients, steps, diet tags and notes.
+// The recipe form, shared by the New Recipe and Edit Recipe screens (N-01, #5, #10): title,
+// description, servings, times, meal types, ingredients, steps, diet tags, the allergens
+// the author marks, and notes.
 // It checks the typed values with recipeSchema for instant feedback and hands the
 // cleaned recipe to onSubmit. It never saves anything itself: the screen decides what
 // saving means (create or update) through onSubmit.
@@ -24,7 +25,7 @@ import {
 } from "@/features/recipes/recipeForm";
 import type { RecipeData } from "@/repositories/RecipeRepository";
 import { borderWidth, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
-import { DIET_TAGS, MEAL_TYPES, recipeSchema, UNITS } from "@/validation/recipeSchema";
+import { ALLERGENS, DIET_TAGS, MEAL_TYPES, recipeSchema, UNITS } from "@/validation/recipeSchema";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -314,6 +315,20 @@ export function RecipeForm({
         />
         {errors.dietTags ? <FieldError message={errors.dietTags} /> : null}
 
+        {/* Allergens the author marks (#10). The recipe filter adds them to what the
+            ingredient data finds. Leaving them empty never means "allergen-free", so the
+            help text says so. Selected chips show a choice, not "safe". */}
+        <Text style={styles.sectionTitle}>Contains these allergens</Text>
+        <Text style={styles.help}>
+          Mark anything this recipe contains. Leaving this empty doesn&apos;t mean the recipe is free of allergens.
+        </Text>
+        <ChipSelect
+          options={ALLERGENS}
+          selected={values.allergens}
+          onToggle={(value) => setField("allergens", toggle(values.allergens, value))}
+        />
+        {errors.allergens ? <FieldError message={errors.allergens} /> : null}
+
         <View style={styles.spacer} />
         <FormField
           label="Notes"
@@ -361,6 +376,12 @@ const styles = StyleSheet.create({
     ...typography.groupHeading,
     color: colors.action,
     marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  // A muted line under a section heading.
+  help: {
+    ...typography.caption,
+    color: colors.textMuted,
     marginBottom: spacing.sm,
   },
   card: {

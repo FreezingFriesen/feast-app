@@ -9,6 +9,7 @@ import {
 } from "@/testing/contracts/recipeRepositoryContract";
 import { createNodeSqliteDatabase } from "@/testing/nodeSqliteDatabase";
 import { runBeforeWrite } from "@/testing/runBeforeWrite";
+import { ALLERGENS } from "@/validation/recipeSchema";
 import { createSqliteRecipeRepository } from "../sqliteRecipeRepository";
 
 type TestDatabase = ReturnType<typeof createNodeSqliteDatabase>;
@@ -99,6 +100,12 @@ describe("SQLite recipe repository", () => {
       ["updated_at before created_at", "UPDATE recipes SET updated_at = created_at - 1 WHERE id = ?"],
       ["an unknown schema version", "UPDATE recipes SET schema_version = 2 WHERE id = ?"],
       ["a bad id", "UPDATE recipes SET id = 'Bad ID' WHERE id = ?"],
+      // A damaged list of marked allergens must never read as "none marked".
+      ["bad JSON for the marked allergens", "UPDATE recipes SET allergens = '[not json' WHERE id = ?"],
+      ["JSON null for the marked allergens", "UPDATE recipes SET allergens = 'null' WHERE id = ?"],
+      ["marked allergens longer than the column can need", `UPDATE recipes SET allergens = '["' || hex(zeroblob(1500)) || '"]' WHERE id = ?`],
+      ["an unknown marked allergen", `UPDATE recipes SET allergens = '["gluten"]' WHERE id = ?`],
+      ["a repeated marked allergen", `UPDATE recipes SET allergens = '["milk","milk"]' WHERE id = ?`],
     ])("a row with %s reads as missing and is skipped by every list", async (_label, tamper) => {
       const { db, repo } = await setup();
       await repo.mergeIncoming(INCOMING_ID, INCOMING_RECIPE);
@@ -138,6 +145,7 @@ describe("SQLite recipe repository", () => {
           ...RECIPE_INPUT,
           mealTypes: ["breakfast", "lunch", "dinner", "snack"],
           dietTags: ["vegan", "vegetarian", "pescatarian", "keto_friendly", "gluten_free", "dairy_free"],
+          allergens: [...ALLERGENS],
           ingredients: Array.from({ length: 50 }, () => ({
             ingredientId: worst(100),
             name: "a".repeat(100),

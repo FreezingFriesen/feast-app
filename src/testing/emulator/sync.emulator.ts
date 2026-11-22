@@ -123,6 +123,33 @@ describe("sync on the Firebase emulators", () => {
     );
   });
 
+  it("carries the allergens an author marks (#10) to a second phone; a recipe saved before them reads as none marked", async () => {
+    const email = harness.uniqueEmail();
+    const a = await phone(email, "sign_up");
+    const marked = expectCreated(await a.recipes.create({ ...RECIPE_FORM_INPUT, title: "Alfredo", allergens: ["wheat", "milk"] }));
+    // Uploaded by a copy of the app from before marked allergens: no allergens field at all.
+    await env.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), `users/${a.uid}/recipes/older-1`), recipeDocument(Date.now() - 60_000)),
+    );
+    expect(await a.sync.syncNow()).toMatchObject({ state: "idle", pendingChanges: 0, problem: null });
+
+    // The server holds the marks, in vocabulary order, under the real Rules.
+    const uploaded = await rawDoc(`users/${a.uid}/recipes/${marked.id}`);
+    expect(uploaded).toMatchObject({ allergens: ["milk", "wheat"] });
+    expect(hasAllowedKeys("recipes", uploaded!)).toBe(true);
+
+    const b = await phone(email, "sign_in");
+    expect(await b.sync.syncNow()).toMatchObject({ state: "idle", problem: null });
+    expect((await b.recipes.getById(marked.id))?.allergens).toEqual(["milk", "wheat"]);
+    expect((await b.recipes.getById("older-1"))?.allergens).toEqual([]);
+
+    // Clearing them on B reaches A.
+    await b.recipes.update(marked.id, { ...RECIPE_FORM_INPUT, title: "Alfredo", allergens: [] });
+    await b.sync.syncNow();
+    await a.sync.syncNow();
+    expect((await a.recipes.getById(marked.id))?.allergens).toEqual([]);
+  });
+
   it("restores 1,200 records page by page, and skips an invalid one", async () => {
     const owner = await phone(harness.uniqueEmail(), "sign_up");
     const base = Date.now() - 60_000;

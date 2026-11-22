@@ -1,5 +1,15 @@
 import type { SyncStatus } from "@/services/sync/SyncService";
-import { canSyncNow, syncSummary } from "../syncMessages";
+import { canSyncNow, ingredientDataLine, syncSummary } from "../syncMessages";
+
+describe("ingredient data line (N-08)", () => {
+  it("says when the ingredient data was downloaded, as a month and day", () => {
+    const fetchedAt = new Date(2026, 10, 19, 14, 30).getTime();
+    const expected = new Date(fetchedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    expect(ingredientDataLine(fetchedAt)).toBe(`Ingredient data: updated ${expected}`);
+    expect(expected).toMatch(/19/);
+    expect(expected).not.toMatch(/14|30|2026/);
+  });
+});
 
 const idle: SyncStatus = { state: "idle", lastSyncedAt: null, pendingChanges: 0, restore: null, problem: null };
 

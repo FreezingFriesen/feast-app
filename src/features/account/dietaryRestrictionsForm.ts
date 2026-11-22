@@ -1,4 +1,4 @@
-import { formatOptionLabel } from "@/components/form/ChipSelect";
+import { formatOptionLabel } from "@/components/form/formatOptionLabel";
 import type { DietaryRestrictions } from "@/repositories/ProfileRepository";
 import type { ALLERGENS, DIET_TAGS } from "@/validation/recipeSchema";
 

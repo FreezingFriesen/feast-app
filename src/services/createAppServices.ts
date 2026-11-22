@@ -1,7 +1,8 @@
 // The composition root: the only place that picks implementations.
-import { emptyIngredientCatalog } from "@/repositories/IngredientCatalog";
+import { createIngredientCatalogStore } from "@/repositories/IngredientCatalogStore";
 import type { Repositories } from "@/repositories/RepositoryProvider";
 import { createSqliteGroceryRepository } from "@/repositories/sqliteGroceryRepository";
+import { createSqliteIngredientRepository } from "@/repositories/sqliteIngredientRepository";
 import { createSqliteMealPlanRepository } from "@/repositories/sqliteMealPlanRepository";
 import { createSqliteProfileRepository } from "@/repositories/sqliteProfileRepository";
 import { createSqliteRecipeRepository } from "@/repositories/sqliteRecipeRepository";
@@ -13,6 +14,9 @@ import { createInMemoryAuthService } from "./auth/inMemoryAuthService";
 import { createInMemoryServer, type InMemoryServerControls } from "./backend/inMemoryServer";
 import type { ConnectivityService } from "./connectivity/ConnectivityService";
 import { domainError } from "./domainErrors";
+import { createIngredientRefresh, type IngredientRefreshEngine } from "./ingredients/createIngredientRefresh";
+import { createInMemoryRemoteIngredientSource } from "./ingredients/inMemoryRemoteIngredientSource";
+import type { RemoteIngredientSource } from "./ingredients/RemoteIngredientSource";
 import { createInMemoryRemoteProfileStore } from "./profiles/inMemoryRemoteProfileStore";
 import type { RemoteProfileStore } from "./profiles/RemoteProfileStore";
 import type { Services } from "./ServiceProvider";
@@ -61,6 +65,8 @@ export type AppServices = {
   repositories: Repositories;
   // Recipe and meal plan sync. The app calls start() once the saved login is restored.
   syncEngine: SyncEngine;
+  // Keeps the phone's copy of the ingredient catalog up to date. Started with syncEngine.
+  ingredientEngine: IngredientRefreshEngine;
   // Failure injection, offline switch and clock for the in-memory backend; null otherwise.
   devControls: InMemoryServerControls | null;
 };
@@ -73,6 +79,7 @@ type Remote = {
   remoteProfiles: RemoteProfileStore;
   remoteContent: RemoteUserContent;
   remoteStore: RemoteContentStore;
+  ingredientSource: RemoteIngredientSource;
   devControls: InMemoryServerControls | null;
 };
 
@@ -103,6 +110,8 @@ function createRemote({ backend, authStorage, connectivity, now, latencyMs }: Re
     remoteProfiles: createInMemoryRemoteProfileStore(server),
     remoteContent: createInMemoryRemoteUserContent(server),
     remoteStore: createInMemoryRemoteContentStore(server),
+    // A small made-up ingredient list (sampleIngredients.ts), not Edwin's data.
+    ingredientSource: createInMemoryRemoteIngredientSource(server),
     devControls: server.controls,
   };
 }
@@ -118,24 +127,27 @@ export function createAppServices({
   latencyMs = 0,
 }: AppServicesOptions): AppServices {
   // Local data stays real whichever backend is chosen: recipes, the meal plan, the
-  // profile and the grocery list state all live in the phone's SQLite database (#1), even
-  // with the in-memory backend.
+  // profile, the grocery list state and the ingredient catalog all live in the phone's
+  // SQLite database (#1), even with the in-memory backend.
+  const ingredients = createSqliteIngredientRepository(database);
   const repositories: Repositories = {
     recipes: createSqliteRecipeRepository(database, now),
     mealPlans: createSqliteMealPlanRepository(database, now),
     profiles: createSqliteProfileRepository(database, now),
     groceries: createSqliteGroceryRepository(database, now),
-    // Empty until the ingredient catalog is built (a separate task): nothing reads the
-    // ingredients collection yet, so the grocery list matches rows by name and lists rows
-    // that need conversion data separately. Only this line changes when it exists.
-    ingredientCatalog: emptyIngredientCatalog,
+    // The last copy of the ingredient data downloaded to this phone (N-08), so the grocery
+    // list can match rows and convert units offline and signed out. Empty (as before the
+    // catalog existed) until a first download.
+    ingredientCatalog: createIngredientCatalogStore(ingredients),
   };
+  // Read the copy from the phone now, without waiting for it or for the network.
+  void repositories.ingredientCatalog.load();
 
   // The 30-day session: where the login date is kept, and the rule that checks it. Built
   // first, because Firebase keeps its own session in this store's secure storage.
   const sessionStore = createSecureSessionStore(secure);
   const sessionPolicy = createSessionPolicy(now);
-  const { auth, usernames, remoteProfiles, remoteContent, remoteStore, devControls } = createRemote({
+  const { auth, usernames, remoteProfiles, remoteContent, remoteStore, ingredientSource, devControls } = createRemote({
     backend,
     authStorage: sessionStore.authStorage,
     connectivity,
@@ -153,7 +165,12 @@ export function createAppServices({
     connectivity,
     now,
   });
-  // Clears everything this phone keeps for the user (log out, account deletion).
+  // Downloads the shared ingredient data into the phone's copy. Separate from sync: it's a
+  // read-only snapshot of reference data, not the user's content.
+  const ingredientEngine = createIngredientRefresh({ auth, connectivity, source: ingredientSource, repository: ingredients, now });
+  // Clears everything this phone keeps for the user (log out, account deletion). Not the
+  // ingredient catalog: it's shared reference data, the same for every user, and keeping
+  // it means the next user on this phone still has it offline.
   const localData = createLocalDataWiper([
     repositories.profiles,
     repositories.recipes,
@@ -172,11 +189,13 @@ export function createAppServices({
       sessionPolicy,
       sessionGuard: createSessionGuard({ auth, store: sessionStore, policy: sessionPolicy, wiper: localData, now }),
       sync,
+      ingredientRefresh: ingredientEngine,
       connectivity,
       localData,
     },
     repositories,
     syncEngine: sync,
+    ingredientEngine,
     devControls,
   };
 }

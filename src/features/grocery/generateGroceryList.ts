@@ -2,11 +2,11 @@
 // each meal's servings (N-09), with the same ingredient merged into one line (N-07) and
 // units combined only when that is safe (N-08). Worked out from the meal plan every time,
 // never stored. Pure: no React, no storage, no network.
+import { findCheckedMatch } from "@/repositories/checkedCatalogMatch";
 import type { CatalogMatch, IngredientCatalog } from "@/repositories/IngredientCatalog";
 import type { MealPlanEntry } from "@/repositories/MealPlanRepository";
 import type { Recipe } from "@/repositories/RecipeRepository";
-import { cleanText } from "@/validation/clean";
-import { catalogMatchSchema } from "@/validation/ingredientSchema";
+import { normaliseName } from "@/validation/clean";
 import { ID_PATTERN } from "@/validation/patterns";
 import { baseToGrams, metricDisplay, toBase, unitFamily, type Density, type Unit, type UnitFamily } from "./units";
 
@@ -57,21 +57,9 @@ const FAMILY_ORDER: readonly UnitFamily[] = ["mass", "volume", "piece", "pinch"]
 // Lines are sorted by name, ignoring case and accents ("Flour" next to "flour").
 const byName = new Intl.Collator("en", { sensitivity: "base" });
 
-// A name as a merge key: cleaned, lower-cased, runs of spaces made one. No guessing about
-// plurals: "Egg" and "Eggs" stay apart until the catalog matches them, because a wrong
-// merge is worse than a missed one.
-export function normaliseName(name: string): string {
-  return cleanText(name).toLowerCase().replace(/\s+/g, " ");
-}
-
-// The catalog's match for a row, checked like any data from outside the app. A match that
-// fails the check is ignored, so a bad density can never produce a wrong amount.
-function findMatch(catalog: IngredientCatalog, row: { ingredientId?: string; name: string }): CatalogMatch | undefined {
-  const found = catalog.find({ ingredientId: row.ingredientId, name: row.name });
-  if (found === undefined) return undefined;
-  const parsed = catalogMatchSchema.safeParse(found);
-  return parsed.success ? parsed.data : undefined;
-}
+// A name as a merge key (cleaned, lower-cased, spaces collapsed). It lives in
+// src/validation/clean.ts so the ingredient catalog matches names the same way.
+export { normaliseName };
 
 // Which rows count as the same ingredient: the catalog's ID, else the row's own
 // ingredientId, else its name. The prefixes keep a name from ever matching an ID. An
@@ -151,7 +139,9 @@ export function generateGroceryList({ entries, recipesById, catalog }: GroceryLi
     for (const row of recipe.ingredients) {
       // Multiply before dividing, and never round: rounding happens only for display.
       const amount = (row.quantity * entry.servings) / recipe.servings;
-      const match = findMatch(catalog, row);
+      // Checked like any data from outside the app (findCheckedMatch): a match that fails
+      // the check is ignored, so a bad density can never produce a wrong amount.
+      const match = findCheckedMatch(catalog, row);
       const key = groupKeyFor(row, match);
       let group = groups.get(key);
       if (group === undefined) {
