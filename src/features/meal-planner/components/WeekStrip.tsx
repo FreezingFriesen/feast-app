@@ -33,6 +33,7 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
         <Text style={styles.month}>{formatMonthYear(selectedKey)}</Text>
         <View style={styles.arrows}>
           <Pressable
+            testID="week-arrow-button"
             onPress={() => onSelect(addDays(selectedKey, -7))}
             accessibilityRole="button"
             accessibilityLabel="Previous week"
@@ -41,6 +42,7 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
             <DecorativeIcon name="chevron-back" size={iconSize.lg} color={colors.text} />
           </Pressable>
           <Pressable
+            testID="week-arrow-button"
             onPress={() => onSelect(addDays(selectedKey, 7))}
             accessibilityRole="button"
             accessibilityLabel="Next week"
@@ -59,6 +61,7 @@ export function WeekStrip({ selectedKey, onSelect, todayKey, hasMeals }: WeekStr
           const isToday = key === todayKey;
           return (
             <Pressable
+              testID="week-strip-day-button"
               key={key}
               onPress={() => onSelect(key)}
               accessibilityRole="button"

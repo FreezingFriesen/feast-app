@@ -43,6 +43,7 @@ export function SignedOutSection() {
         <View style={styles.logInRow}>
           <Text style={styles.logInText}>Already have an account?</Text>
           <Pressable
+            testID="log-in-link"
             onPress={() => router.push("/account/log-in")}
             accessibilityRole="button"
             accessibilityLabel="Log in"

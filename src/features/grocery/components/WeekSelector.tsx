@@ -54,6 +54,7 @@ type WeekArrowProps = { icon: IconName; label: string; disabled: boolean; onPres
 function WeekArrow({ icon, label, disabled, onPress }: WeekArrowProps) {
   return (
     <Pressable
+      testID="week-arrow-button"
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"

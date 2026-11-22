@@ -26,6 +26,7 @@ export function TextAction({
   // hitSlop makes the tappable area 8 points bigger on every side than the text.
   return (
     <Pressable
+      testID="text-action-button"
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"

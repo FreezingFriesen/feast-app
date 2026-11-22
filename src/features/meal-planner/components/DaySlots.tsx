@@ -50,6 +50,7 @@ export function DaySlots({ slots, recipesById, onAdd, onPressEntry }: DaySlotsPr
               const details = [time, formatServings(entry.servings)].filter(Boolean).join(" · ");
               return (
                 <Pressable
+                  testID="day-slot-entry-button"
                   key={entry.id}
                   onPress={() => onPressEntry(entry)}
                   accessibilityRole="button"
@@ -76,6 +77,7 @@ export function DaySlots({ slots, recipesById, onAdd, onPressEntry }: DaySlotsPr
             {/* "Add a meal" disappears once the slot holds the most meals allowed. */}
             {entries.length < MAX_ENTRIES_PER_SLOT ? (
               <Pressable
+                testID="day-slot-add-button"
                 onPress={() => onAdd(mealType)}
                 accessibilityRole="button"
                 accessibilityLabel={`Add a recipe to ${label}`}

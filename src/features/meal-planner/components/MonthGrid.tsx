@@ -51,6 +51,7 @@ export function MonthGrid({
         <Text style={styles.month}>{formatMonthYear(monthKey)}</Text>
         <View style={styles.arrows}>
           <Pressable
+            testID="month-arrow-button"
             onPress={() => onChangeMonth(-1)}
             accessibilityRole="button"
             accessibilityLabel="Previous month"
@@ -59,6 +60,7 @@ export function MonthGrid({
             <DecorativeIcon name="chevron-back" size={iconSize.lg} color={colors.text} />
           </Pressable>
           <Pressable
+            testID="month-arrow-button"
             onPress={() => onChangeMonth(1)}
             accessibilityRole="button"
             accessibilityLabel="Next month"
@@ -93,6 +95,7 @@ export function MonthGrid({
             return (
               // Screen readers hear the date and what's planned, since they can't see the markers.
               <Pressable
+                testID="month-grid-day-button"
                 key={key}
                 onPress={() => onPressDay(key)}
                 accessibilityRole="button"

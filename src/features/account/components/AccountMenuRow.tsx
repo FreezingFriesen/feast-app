@@ -14,8 +14,9 @@ type AccountMenuRowProps = {
 // a caption, and a chevron. Opens another Account screen.
 export function AccountMenuRow({ icon, title, caption, onPress }: AccountMenuRowProps) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={title} style={styles.row}>
+    <Pressable testID="account-menu-row-button" onPress={onPress} accessibilityRole="button" accessibilityLabel={title} style={styles.row}>
       {/* Orange is fine here: the icon is decoration next to the title. */}
+      
       <View style={styles.tile}>
         <DecorativeIcon name={icon} size={iconSize.md} color={colors.accent} />
       </View>

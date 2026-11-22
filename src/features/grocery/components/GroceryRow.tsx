@@ -23,6 +23,7 @@ export function GroceryRow({ name, amount, accessibilityLabel, checked, onToggle
   return (
     <View style={styles.row}>
       <Pressable
+        testID="grocery-row-button"
         onPress={onToggle}
         accessibilityRole="checkbox"
         accessibilityState={{ checked }}
@@ -42,7 +43,7 @@ export function GroceryRow({ name, amount, accessibilityLabel, checked, onToggle
         {amount ? <Text style={[styles.amount, checked && styles.checkedText]}>{amount}</Text> : null}
       </Pressable>
       {onRemove ? (
-        <Pressable onPress={onRemove} accessibilityRole="button" accessibilityLabel={`Remove ${name}`} style={styles.remove}>
+        <Pressable testID="grocery-row-remove-button" onPress={onRemove} accessibilityRole="button" accessibilityLabel={`Remove ${name}`} style={styles.remove}>
           <DecorativeIcon name="close" size={iconSize.md} color={colors.textMuted} />
         </Pressable>
       ) : null}

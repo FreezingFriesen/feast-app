@@ -28,6 +28,7 @@ export function SegmentedControl<T extends string>({
         const isSelected = option === value;
         return (
           <Pressable
+            testID="segmented-control-option-button"
             key={option}
             onPress={() => onChange(option)}
             accessibilityRole="tab"

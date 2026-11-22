@@ -285,6 +285,7 @@ export function RecipeForm({
             />
             {values.steps.length > 1 ? (
               <Pressable
+                testID="remove-step-button"
                 onPress={() => setField("steps", values.steps.filter((_, i) => i !== index))}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove step ${index + 1}`}

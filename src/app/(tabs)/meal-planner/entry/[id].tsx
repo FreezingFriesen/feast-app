@@ -128,6 +128,7 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
       <Text style={styles.sectionTitle}>Servings</Text>
       <View style={styles.stepper}>
         <Pressable
+          testID="set-servings-decrease-button"
           onPress={() => setServings((current) => Math.max(MIN_SERVINGS, current - 1))}
           disabled={servings <= MIN_SERVINGS}
           accessibilityRole="button"
@@ -140,6 +141,7 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
           {servings}
         </Text>
         <Pressable
+          testID="set-servings-increase-button"
           onPress={() => setServings((current) => Math.min(MAX_SERVINGS, current + 1))}
           disabled={servings >= MAX_SERVINGS}
           accessibilityRole="button"

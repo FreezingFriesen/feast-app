@@ -35,6 +35,7 @@ export function ChipSelect<T extends string>({
         const isSelected = selected.includes(option);
         return (
           <Pressable
+            testID="chip-select-option-button"
             key={option}
             onPress={() => onToggle(option)}
             accessibilityRole="button"

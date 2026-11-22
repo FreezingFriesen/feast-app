@@ -55,6 +55,7 @@ export default function RecipesScreen() {
               </Text>
             </View>
             <Pressable
+              testID="edit-recipe-button"
               onPress={() => router.push({ pathname: "/recipes/edit/[id]", params: { id: item.id } })}
               accessibilityRole="button"
               accessibilityLabel={`Edit ${item.title}`}
