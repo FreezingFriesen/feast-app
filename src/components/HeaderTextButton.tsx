@@ -11,6 +11,7 @@ type HeaderTextButtonProps = PressableProps & {
 export function HeaderTextButton({ label, accessibilityLabel, ...pressableProps }: HeaderTextButtonProps) {
   return (
     <Pressable
+      testID="header-text-button"
       accessibilityRole="button"
       hitSlop={8}
       {...pressableProps}

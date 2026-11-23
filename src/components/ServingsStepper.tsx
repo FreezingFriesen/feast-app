@@ -16,6 +16,9 @@ type ServingsStepperProps = {
   // Show the number between the buttons. Off where the number is shown elsewhere (the
   // recipe detail screen's stat strip), as in the recipe mockup.
   showValue?: boolean;
+  // IDs for the automated button test (allButtons.e2e.js).
+  decreaseTestID?: string;
+  increaseTestID?: string;
 };
 
 // − and + buttons for a number of servings: outlined green 44pt squares, as in the
@@ -29,10 +32,13 @@ export function ServingsStepper({
   decreaseLabel,
   increaseLabel,
   showValue = true,
+  decreaseTestID,
+  increaseTestID,
 }: ServingsStepperProps) {
   return (
     <View style={styles.stepper}>
       <Pressable
+        testID={decreaseTestID}
         onPress={onDecrease}
         disabled={!canDecrease}
         accessibilityRole="button"
@@ -48,6 +54,7 @@ export function ServingsStepper({
         </Text>
       ) : null}
       <Pressable
+        testID={increaseTestID}
         onPress={onIncrease}
         disabled={!canIncrease}
         accessibilityRole="button"

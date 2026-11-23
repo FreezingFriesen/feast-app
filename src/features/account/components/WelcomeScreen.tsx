@@ -130,6 +130,7 @@ export function WelcomeScreen() {
           <View style={styles.logInRow}>
             <Text style={styles.onWelcomeText}>Already have an account?</Text>
             <Pressable
+              testID="log-in-link"
               onPress={() => router.push("/log-in")}
               accessibilityRole="button"
               accessibilityLabel="Log in"

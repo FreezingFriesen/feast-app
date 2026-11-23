@@ -25,6 +25,7 @@ export function AppHeader({ title, onBack, right }: AppHeaderProps) {
       <View style={styles.side}>
         {onBack ? (
           <Pressable
+            testID="app-header-back-button"
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="Back"

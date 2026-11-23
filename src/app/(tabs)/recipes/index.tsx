@@ -112,6 +112,7 @@ function RecipeRow({ row, onOpen, onEdit }: RecipeRowProps) {
         <RecipeRowNotes notes={row.notes} />
       </Pressable>
       <Pressable
+        testID="edit-recipe-button"
         onPress={onEdit}
         accessibilityRole="button"
         accessibilityLabel={`Edit ${recipe.title}`}

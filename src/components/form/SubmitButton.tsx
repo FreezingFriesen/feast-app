@@ -31,6 +31,7 @@ export function SubmitButton({
   // It darkens while pressed.
   return (
     <Pressable
+      testID="submit-button"
       onPress={onPress}
       disabled={inactive}
       accessibilityRole="button"

@@ -133,6 +133,8 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
         canIncrease={servings < MAX_SERVINGS}
         decreaseLabel="Fewer servings"
         increaseLabel="More servings"
+        decreaseTestID="set-servings-decrease-button"
+        increaseTestID="set-servings-increase-button"
       />
 
       {/* Move to: pick a day from the week strip, then Breakfast, Lunch or Dinner.
