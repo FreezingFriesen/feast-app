@@ -46,9 +46,41 @@ Status: recipes are stored in SQLite and survive a restart (#1). Editing is buil
 It uses the same `RecipeForm` as New Recipe and saves through `RecipeRepository.update`
 (on the phone first, synced later). An ingredient's `ingredientId` and `note`, which the
 form doesn't show, are kept, and the `ingredientId` is dropped if the ingredient is
-renamed, so it reads as unmatched. Still to do for N-01: the recipe detail screen and
-delete (`remove`, a soft delete, is in the repository but no screen uses it). Leaving
-the edit screen doesn't ask before discarding changes (needs Expo SDK 58, see Open items).
+renamed, so it reads as unmatched. Leaving the edit screen doesn't ask before discarding
+changes (needs Expo SDK 58, see Open items).
+
+**Viewing (N-01) and the on-screen serving scaler (#8) are built.** Tapping a recipe in the
+list opens `recipes/[id]`, a read-only screen laid out like mockup 04:
+- **Opening it:**
+  - The route param is checked with `recipeIdSchema` before anything is read. An invalid
+    or deleted recipe shows "Recipe not found".
+  - The screen reads the recipe again after every change, so an edit shows as soon as it's
+    saved.
+  - The "•••" menu has "Edit recipe".
+- **Layout:**
+  - A stat strip: total time (or "—"), the ingredient count, and the servings shown.
+  - The ingredients with a − / + scaler (1 to 100, checked with `recipeServingsSchema`).
+    Amounts use the grocery list's own `scaleQuantity` and `formatAmount`. The scaler is
+    view only: never saved, and it resets when the screen closes.
+  - Then the description, numbered steps, diet tags and notes.
+- **Allergen notes**, from the same pure functions as the list:
+  - "Contains: …" for the user's allergens, whether or not the list's filter is on.
+  - "Couldn't check: …" when the user avoids any allergen.
+  - "Tagged Vegan, but contains Milk" for any of the recipe's tags.
+  - The same data notice as the list. Nothing while the profile or catalog is loading.
+- The view is `buildRecipeDetailView` (`src/features/recipes/detail/`), pure and tested.
+
+Still to do for N-01: delete (`remove`, a soft delete, is in the repository but no screen
+uses it). N-01 and #8 aren't ticked until a person has checked the detail screen on a
+phone:
+- open a recipe from the list
+- scale up and down
+- Edit from the menu and come back (the change shows)
+- an invalid ID as a deep link shows "Recipe not found"
+- a milk allergy on a recipe with "Whole milk" shows "Contains: Milk"
+- large text doesn't clip the stat strip or "Start cooking"
+
+These checks unblock test cases TC026 and TC032 (detail screen) and TC027 to TC031 (scaler).
 
 Filtering and sorting (#10, N-04, and the diet, allergy and meal type part of N-03) is
 built on the Recipes tab. The Phase 2 hand check also runs in code, on the real
@@ -171,7 +203,7 @@ Status: The Account tab runs on either backend, chosen by `EXPO_PUBLIC_BACKEND`:
 the in-memory fake (the default) or real Firebase Auth and Firestore. Done so far:
 validation, interfaces, domain errors, the 30-day session, chunked secure token
 storage, the SQLite profile cache and the composition root, plus:
-- signed-out screens: log in, sign up, forgot password, choose username
+- signed-out screens: the welcome screen, log in, sign up, forgot password, choose username
 - signed-in page: a menu with Account Details (profile, session info, change
   password, delete account) and Allergies & Diets (dietary restrictions), plus the
   sync status card and log out
@@ -188,6 +220,39 @@ A new phone restores everything with progress on the Account page. Recipes and m
 plans are proven on the in-memory backend and the emulators (`npm test`,
 `npm run test:backend`); the real project checks are still to do. The profile
 (dietary restrictions, N-18) still syncs only at sign up and sign in.
+
+**An account is required (auth gate, N-14, N-15).** With no active session the app opens
+on the full-screen welcome screen (`src/app/(auth)/welcome.tsx`, from mockup 05), and the
+tabs don't exist:
+- **Which screens:** `deriveAuthRoute` (`src/features/account/gate/authGate.ts`, pure and
+  tested) picks `splash`, `welcome`, `username` or `app` from the signed-in user, the
+  30-day session check and the profile. The root layout gives each group a
+  `Stack.Protected` guard. The tabs need a session the check has confirmed for the
+  signed-in user. Nothing about it is stored (no "logged in" flag).
+- **Offline:** a saved session that's inside its 30 days opens the tabs with no network
+  call. Only logging in and signing up need a connection; the welcome screen says so when
+  offline.
+- **At start:** the splash stays up until the first session check and the profile read
+  finish, so neither the tabs nor the welcome screen flash.
+- **Fails closed:** an expired session (day 30, per `SessionPolicy`), no session, or a
+  check that throws shows the welcome screen. A check that throws also signs out (best
+  effort) but never wipes. The expired message now shows (it used to be lost when the
+  check's own sign out changed the user).
+- **After log in or sign up**, the gate replaces the welcome screens with the tabs (or
+  the username step), so Back can't return. While a log in, sign up or username save is
+  running, the gate keeps its screen up (`holdWhile`), so a half-finished sign up doesn't
+  flash the username step.
+- **Username step:** an account with no username sees `choose-username` (with Log out)
+  instead of the tabs until one is saved.
+- **Log out and account deletion** land on the welcome screen, which also shows "Your
+  account has been deleted", or "couldn't clear this phone" with Try again.
+- **Deep links and Android Back:** a link to a screen that isn't available goes to the
+  first allowed screen (`src/app/+not-found.tsx`).
+- **Social buttons:** "Continue with Google / Facebook / Apple" are placeholders. They look
+  like the mockup, say "coming soon" when pressed, and send nothing
+  (`src/features/account/socialProviders.ts`).
+
+Not ticked until a person checks the gate on a phone on both backends (see the Open item).
 
 Nothing is ticked until a person confirms it on the real Firebase project (see "When
 the Firebase project is connected" in Open items). Account tab phases:
@@ -641,6 +706,15 @@ To be planned.
   - The filter is view only: a recipe already in the meal plan, or on the grocery list,
     stays there even if it contains the user's allergens.
   - "Newest" sorts by `updatedAt`, so it really means "most recently edited".
+- Known limits of the recipe detail screen (N-01, #8):
+  - No recipe photos: a cream panel with the Feast "F" stands in. A photo field would be a
+    data model, validation, Rules and storage change.
+  - No difficulty field, so the stat strip shows "Ingredients" where the mockup has
+    "Difficulty".
+  - "Start cooking" scrolls to the steps and moves the screen reader there. There's no
+    step-by-step cooking mode yet (to decide).
+  - No ingredient swap icons, and no Delete (the delete flow isn't built).
+  - The scaled servings aren't saved, and the meal planner keeps its own servings per meal.
 - Re-authenticating (e.g. to change password) doesn't restart the 30-day session
   on the device. The planned server-side `auth_time` check would restart it, so
   the device is stricter. Decide whether re-authentication should count as a new
@@ -668,8 +742,26 @@ To be planned.
   part way through.
 - Deleting an account is only offered once it has a username. An account whose
   sign up stopped half way has to choose a username first.
-- Should Recipes, Meal Planner and Grocery List require being signed in? Today an
-  expired session doesn't block them.
+- Decided (Nov 23, 2026): Recipes, Meal Planner and Grocery List require being signed in
+  (the auth gate). Consequences:
+  - Login needs a connection, so a phone that has never signed in, or whose session
+    has expired, can't open the app offline. An expired session keeps local data
+    (`accountDecisions.ts`), but it can't be reached until the user logs in online.
+  - The `memory` backend forgets the session on every reload, so every reload shows
+    the welcome screen.
+  - Recipes made while signed out on an older build stay on the phone. Sync gives
+    them to the first account that signs in there (`sync_meta`); logging out wipes them.
+  - The recipe filter still handles `signed_out` and `needs_username` (pure code with
+    tests), though the tabs never show either now.
+- Social sign-in buttons on the welcome screen are placeholders only (work in progress):
+  no SDK, no OAuth, no network calls. Real social sign-in needs native modules and a
+  development build.
+- Phone check for the auth gate, on both backends:
+  - fresh install → welcome; log in → Recipes; kill and reopen → Recipes with no welcome flash
+  - airplane mode and reopen → Recipes; log out → welcome
+  - Android Back on the welcome screen leaves the app (it never reaches the tabs)
+  - `feastapp:///recipes/x` while signed out → welcome
+  - each social button shows its "coming soon" message
 - When the Firebase project is connected (Account Phase 6), a person must check these
   on a real phone and the real project. The emulator tests can't show them. Set
   `EXPO_PUBLIC_BACKEND=firebase` and the six Firebase values in `.env.local`.

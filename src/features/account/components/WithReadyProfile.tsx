@@ -15,7 +15,7 @@ type WithReadyProfileProps = {
 };
 
 // For the Account screens opened from the menu (Account Details, Allergies & Diets).
-// They need the profile, but can also be opened from a link while signed out, so this
+// They need the profile, which may still be loading or not on this phone yet, so this
 // shows what to do instead until the profile is ready.
 export function WithReadyProfile({ children }: WithReadyProfileProps) {
   const router = useRouter();
@@ -31,17 +31,12 @@ export function WithReadyProfile({ children }: WithReadyProfileProps) {
       </View>
     );
   }
-  // Nobody is signed in (e.g. the session ran out): ask them to log in first.
-  if (account.status === "signed_out") {
-    return (
-      <AccountFormScreen>
-        <FormMessage tone="info" message="Log in to see your account." />
-        <SubmitButton label="Log in" onPress={() => router.replace("/account/log-in")} />
-      </AccountFormScreen>
-    );
-  }
-  // No username yet, or the profile isn't on this phone: the Account page explains why
-  // and offers the next step.
+  // The auth gate only shows the tabs to a signed-in user, so this is only the moment
+  // between logging out and the welcome screen replacing the tabs.
+  if (account.status === "signed_out") return null;
+  // The profile isn't on this phone: the Account page explains why and offers to try
+  // again. (An account with no username never reaches the tabs: the gate shows the
+  // username step instead.)
   return (
     <AccountFormScreen>
       <FormMessage tone="info" message="Your account isn't ready on this phone yet." />

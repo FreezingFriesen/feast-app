@@ -165,7 +165,8 @@ describe("recipeSchema", () => {
   });
 });
 
-// The edit screen's route param (/recipes/edit/[id]) can come from a deep link.
+// The detail and edit screens' route param (/recipes/[id], /recipes/edit/[id]) can come
+// from a deep link. An invalid one shows "Recipe not found" without reading anything.
 describe("recipeIdSchema", () => {
   it.each(["a", "recipe-ab_12", "recipe_1234-abcd", "a".repeat(100)])("accepts %p", (id) => {
     expect(recipeIdSchema.safeParse(id).success).toBe(true);
@@ -180,6 +181,7 @@ describe("recipeIdSchema", () => {
     ["101 characters", "a".repeat(101)],
     ["a repeated param (array)", ["a"]],
     ["missing", undefined],
+    ["null", null],
     ["a number", 1],
     ["SQL injection", "'; DROP TABLE recipes;--"],
     ["a script tag", "<script>alert(1)</script>"],

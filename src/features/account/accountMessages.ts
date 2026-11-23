@@ -34,6 +34,10 @@ const ACTION_TEXT: Record<AccountAction, string> = {
 // The username rules in words, built from the same limits the schema uses.
 export const USERNAME_HINT = `${MIN_USERNAME_LENGTH}–${MAX_USERNAME_LENGTH} characters: letters, numbers and underscores.`;
 
+// On the welcome screen when the phone is offline. The buttons still work; the forms
+// say what went wrong.
+export const WELCOME_OFFLINE_MESSAGE = "You're offline. Signing up or logging in needs a connection.";
+
 // N-16: shown whether or not an account exists for the email.
 export const PASSWORD_RESET_SENT =
   "If an account exists for that email, we've sent it a link to reset your password. Check your inbox.";

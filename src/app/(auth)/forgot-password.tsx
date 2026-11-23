@@ -12,21 +12,18 @@ import {
 } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
 import { colors, spacing, typography } from "@/theme";
-import { AlreadySignedIn } from "@/features/account/components/AlreadySignedIn";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
-import { useAuthUser } from "@/features/account/useAuthUser";
 import { useOnline } from "@/features/account/useOnline";
 import { MAX_EMAIL_LENGTH, passwordResetSchema } from "@/validation/authSchema";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 
-// The "Forgot password?" screen, opened from the log in form.
+// The "Forgot password?" screen, opened from the log in form. Only reachable while
+// signed out (the auth gate in src/features/account/gate/).
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const { signIn } = useAccountFlows();
-  // The signed-in user, or null if nobody is signed in.
-  const user = useAuthUser();
   // true or false once known, null while the first check is still running.
   const online = useOnline();
   const [email, setEmail] = useState("");
@@ -38,9 +35,6 @@ export default function ForgotPasswordScreen() {
   const [sent, setSent] = useState(false);
   // True while sending, so the button can't be pressed twice.
   const [busy, setBusy] = useState(false);
-
-  // Someone is already signed in, so there's no password to reset here.
-  if (user) return <AlreadySignedIn />;
 
   // Only true once we know the phone is offline. While the first check is still
   // running, the button stays enabled.

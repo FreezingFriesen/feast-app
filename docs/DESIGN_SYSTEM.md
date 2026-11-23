@@ -75,6 +75,8 @@ Also defined:
 
 `contrastPairs` in `colors.ts` lists every pair the app draws. `contrast.test.ts` fails
 if any pair is below 4.5:1 for text or 3:1 for UI graphics. The recipe filter (#10, N-04)
+The welcome screen (N-14) added two pairs, no colours: the ink divider lines on orange, and
+the ink label on the white social buttons. The recipe filter (#10, N-04)
 added pairs only, no colours: `errorText` on white (row warnings), the white switch thumb
 on the green and grey tracks, and the grey track on white.
 
@@ -207,17 +209,39 @@ unless noted.
 | `form/SubmitButton` | `label`, `busyLabel?`, `busy?`, `disabled?`, `variant` | primary (green), secondary (white, green edge), destructive (red). Spinner while busy, faded when inactive | button with disabled and busy state |
 | `form/ChipSelect` | `options`, `selected`, `onToggle`, `formatLabel?` (defaults to `formatOptionLabel`, a plain module in `form/formatOptionLabel.ts` that pure code can use too) | `inputBorder` edge. Selected: green with a ✓ | button with selected state |
 | `SegmentedControl` | `options`, `value`, `onChange` | Cream track, white selected pill with bold green text | tablist / tab with selected state |
+| `ServingsStepper` | `value`, `onDecrease`, `onIncrease`, `canDecrease`, `canIncrease`, `decreaseLabel`, `increaseLabel`, `showValue?` | Outlined green 44pt − and + squares (2pt `action` edge), the number between them unless `showValue` is false; faded at the limits. Used by Edit meal and the recipe detail screen | buttons with the given labels and disabled state |
 | `TextAction` | `label`, `onPress`, `disabled?`, `tone`, `align?: center \| start`, `accessibilityLabel?` | Green text, or red for destructive | button with disabled state, hitSlop to 44pt |
 | `features/account/components/AccountSection` | `title`, `children` | White card with a green group heading | Title is a header |
 | `features/account/components/AccountMenuRow` | `icon`, `title`, `caption`, `onPress` | Cream icon tile (decorative orange icon), title, caption, green chevron, divider | button labelled with the title |
-| `features/account/components/WithReadyProfile` | `children(user, profile)` | Renders the screen once the profile is ready; otherwise a spinner, "Log in", or "Go to your account" | — |
+| `features/account/components/WithReadyProfile` | `children(user, profile)` | Renders the screen once the profile is ready; otherwise a spinner or "Go to your account" | — |
+| `features/account/components/SocialButton` | `label`, `icon`, `accessibilityHint`, `onPress` | White (`surface`) full-width button, 48 tall, radius 12, ink logo and label; cream while pressed. The logos are ink because the providers' colours aren't in the palette | button with label and hint |
 
 Feature components follow the same tokens:
 - `features/meal-planner/components/WeekStrip`: cream day cards, selected green,
   today outlined.
 - `DaySlots`: slot headings, meal cards with a meal-type icon tile.
 - `MonthGrid`: outlined markers in fixed positions.
-- `features/account/components/SignedOutSection`: the welcome screen.
+- `features/account/components/WelcomeScreen` (route `(auth)/welcome`): the welcome screen
+  (mockup 05), shown whenever nobody is signed in. The `welcomeGradient` (green behind the
+  wordmark, fading to orange) stands in for the food photo, because the wordmark's orange F,
+  t and tagline would disappear on plain orange. When a licensed photo arrives, put it at
+  `assets/brand/welcome-photo.jpg` and draw it with `expo-image` behind a fade to orange.
+  From the top:
+  - the wordmark at 80% of the width
+  - a notice (session ended, account deleted, or "couldn't clear this phone" with Try again)
+  - the offline line
+  - "Sign up with email" (primary)
+  - an ink "or continue with" divider
+  - three `SocialButton`s
+  - the "coming soon" message after one is pressed (info, polite)
+  - "Already have an account? **Log in**" in ink with a 44pt target
+
+  Everything scrolls, so large text isn't cut off.
+- **Social sign-in buttons are placeholders** (a deliberate exception to "don't fake it",
+  decided Nov 23, 2026 for the showcase). They look like the mockup and aren't greyed out.
+  Pressing one shows "Continue with Google is coming soon. Use Sign up with email for now."
+  Screen readers hear "Coming soon. Not available yet." Nothing is sent anywhere
+  (`src/features/account/socialProviders.ts`).
 - `features/recipes/components/RecipeForm`: the recipe form shared by New Recipe and
   Edit Recipe (text boxes, chips, ingredient cards, steps). It takes `initialValues`,
   the button labels and `onSubmit`, and never saves anything itself. On edit, the save
@@ -227,9 +251,32 @@ Feature components follow the same tokens:
   allergens." Selected chips use the usual green with a ✓, as on Allergies & Diets: they
   show a choice, never "safe".
 - Recipe list rows (`recipes/index`): border-only cards with a trailing edit button
-  (green pencil, 44pt, labelled "Edit <title>"). Only the button opens the editor;
-  tapping the row itself is kept for the detail screen. Allergen and diet notes sit under
-  the meta line (`RecipeRowNotes`, below).
+  (green pencil, 44pt, labelled "Edit <title>"). Tapping the rest of the row opens the
+  detail screen (a separate 44pt button beside the pencil, never one inside the other).
+  Only the pencil opens the editor. Allergen and diet notes sit under the meta line
+  (`RecipeRowNotes`, below).
+- `features/recipes/components/RecipeDetail` (route `recipes/[id]`, mockup 04): the recipe,
+  read-only. From the top:
+  - **Picture area:** a `chrome` panel at 40% of the screen height with the decorative "F"
+    mark (no photo field yet).
+  - **Header:** `AppHeader` floating over it (title "Recipes", Back, F mark), with
+    `RecipeMoreMenu` on the right: a 44pt green "•••" opening a small white menu (control
+    grey edge, no shadow) with "Edit recipe".
+  - **White sheet:** radius 20 top corners, overlapping the picture area, with the title
+    (`heading`, centred) and the muted subtitle ("Lunch / 15 min").
+  - **Stat strip:** a cream band with three columns, each an italic green `caption` value
+    over a bold ink `label`. Each column is read as one item, e.g. "Total time: 15 min".
+  - **Notes:** `RecipeRowNotes` and the info data notice.
+  - **Ingredients:** a heading with `ServingsStepper` (no number; the strip shows it). Each
+    row has the name in `text`, the amount in `textMuted` (6.48:1, not the mockup's light
+    grey), a muted note, and a `border` hairline.
+  - **The rest:** Description, numbered Steps, diet tags as read-only cream pills (not the
+    green selectable chips), Notes.
+  - **"Start cooking":** a primary button pinned under the list, above the tab bar. It
+    scrolls to Steps and moves the screen reader there.
+  - **Servings changes** are announced ("4 servings").
+  - **Other states:** loading (spinner), "Recipe not found" and "Couldn't open this recipe"
+    (`EmptyState` with "Back to recipes") use the usual header.
 - The recipe filter (#10, N-04). **No mockup shows a filter UI**, so it's built from the
   shared parts. **Allergen states never use green or a ✓**, and nothing says "safe": the
   absence of a warning is the only positive signal.
@@ -304,21 +351,23 @@ Feature components follow the same tokens:
 
 | Route | Mockup | Status | Plan IDs |
 |---|---|---|---|
-| `(tabs)/recipes/index` | none (brand defaults; no mockup has a filter UI) | Done; each row has an edit button; profile filter, Filters panel, sort and allergen notes | #1, N-01, #10, N-04, N-03 (part) |
+| `(tabs)/recipes/index` | none (brand defaults; no mockup has a filter UI) | Done; tapping a row opens the recipe, and each row has an edit button; profile filter, Filters panel, sort and allergen notes | #1, N-01, #10, N-04, N-03 (part) |
 | `(tabs)/recipes/new` | none (brand defaults) | Done, with "Contains these allergens" | N-01, #5, #10 |
 | `(tabs)/recipes/edit/[id]` | none (brand defaults) | Done (same form as new) | N-01, #10 |
-| recipe detail | `04-recipe-detail.png` | **Not built** (no route) | N-01, #8 |
+| `(tabs)/recipes/[id]` | `04-recipe-detail.png` | Done: placeholder instead of the photo, Ingredients instead of Difficulty, no swap icons, "Start cooking" scrolls to the steps | N-01, #8 |
 | `(tabs)/meal-planner/index` (week) | `02-meal-planner-week-filled.png` | Done, minus photos, swap and expand | #4, #17, N-05 |
 | `(tabs)/meal-planner/index` (month) | none (brand defaults) | Done | #4 |
 | `(tabs)/meal-planner/day/[date]` | none (brand defaults) | Done | #4, #17 |
 | `(tabs)/meal-planner/pick-recipe` | none (brand defaults) | Done; the allergy & diet filter banners (no links, no Filters panel), row notes read out with each recipe's name | N-05, #10, N-04 |
 | `(tabs)/meal-planner/entry/[id]` | none (stepper style from 04) | Done | N-05 |
 | `(tabs)/grocery-list` | `01-grocery-list-filled.png` (not in the repo yet) | Done from this system: week selector, list with checkboxes, "Added by you", inline add form; no cost or aisles | #6, N-07, N-09, N-10 |
-| `(tabs)/account/index` (signed out) | `05-welcome-signed-out.png` | Done, without social login or the photo | N-13, N-14 |
+| `(auth)/welcome` | `05-welcome-signed-out.png` | Done: gradient instead of the photo, social buttons as "coming soon" placeholders | N-13, N-14, N-21 |
+| `(auth)/log-in`, `sign-up`, `forgot-password` | none (brand defaults) | Done (moved out of the Account tab; only reachable signed out) | N-13, N-14, N-16 |
+| `choose-username` | none (brand defaults) | Done (shown instead of the tabs until a username is saved; has Log out) | N-13 |
 | `(tabs)/account/index` (signed in) | `03-account-signed-in.png` | Done, real rows only | N-15 to N-19, #19 |
 | `(tabs)/account/details` | from 03 | Done (profile, security, delete) | N-15, N-17 |
 | `(tabs)/account/dietary` | from 03 | Done (allergies and diets) | N-18 |
-| `(tabs)/account/log-in`, `sign-up`, `forgot-password`, `choose-username`, `change-password`, `delete-account` | none (brand defaults) | Done | N-13 to N-17 |
+| `(tabs)/account/change-password`, `delete-account` | none (brand defaults) | Done | N-15, N-17 |
 
 "Done" means it follows this system and the mockup within the rules below. N-21 is
 ticked only after a person checks the screens on a phone.
@@ -339,14 +388,13 @@ ticked only after a person checks the screens on a phone.
 | Grocery list cost, grouping by store aisle or category | 01 | N-11 (price data), ingredient data |
 | Explore tab (recipe library) | all | Later (post-MVP) |
 | Recipe photos | 02, 04 | No image field (data model, validation, Rules, storage) |
-| Recipe detail screen, "View recipe" | 02, 04 | N-01 |
-| Serving scaler (− +) on a recipe | 04 | #8, N-09 |
-| Difficulty | 04 | No field in the data model |
-| Ingredient swap icons, meal card expand, "Start cooking" | 02, 04 | No feature planned |
+| "View recipe" on a meal card | 02 | The detail screen exists (N-01); the planner doesn't link to it yet |
+| Difficulty | 04 | No field in the data model (the detail screen shows Ingredients there) |
+| Ingredient swap icons, meal card expand | 02, 04 | No feature planned |
+| A cooking mode behind "Start cooking" | 04 | No feature planned; the button scrolls to the steps |
 | One "Add a meal" button for the whole day | 02 | Needs a slot chooser; each slot keeps its own button |
-| Header "•••" menu | all | No feature |
+| Header "•••" menu (except the recipe detail screen's, which has "Edit recipe") | all | No feature |
 | Saved Recipes, App Settings, Help & Support, Ingredient Preferences rows | 03 | No features |
-| Google, Facebook and Apple sign-in | 05 | Not planned; needs native modules and a dev build |
 | The welcome screen's food photo | 05 | No licensed photo; a green-to-orange gradient stands in |
 
 ### Deviations from the mockups
@@ -359,6 +407,13 @@ ticked only after a person checks the screens on a phone.
 | Big scrolling day cards, week starting Sunday | Seven fitted cards, week starting Monday | The whole week stays visible; the planner's week starts Monday |
 | "LOG OUT" in capitals | "Log out" | The label is shared with the log-out flow; screen readers spell out capitals |
 | Back chevron on tab root screens | None | There's nowhere to go back to |
+| White "or continue with" and log-in line on orange | Ink | White is 2.63:1 on orange; ink is 6.28:1 |
+| Coloured Google logo | Ink Ionicons logos | The providers' colours aren't in the palette |
+| Food photo behind the logo | `welcomeGradient` | No licensed photo; the wordmark needs green behind it |
+| Recipe photo | Cream panel with the "F" mark | Recipes have no photo field |
+| "Difficulty" in the recipe stat strip | "Ingredients" (the count) | No difficulty field in the data model |
+| Light grey ingredient amounts | `textMuted` | The mockup's grey doesn't reach 4.5:1 on white |
+| Swap icons on ingredient rows | None | Ingredient swaps aren't planned |
 
 ## Open questions (for Alex)
 1. Is cream `#FFF2E9` official? Are ink `#1F1F1F` and error red `#C62828` acceptable?

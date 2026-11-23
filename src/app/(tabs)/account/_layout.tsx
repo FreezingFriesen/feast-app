@@ -18,10 +18,6 @@ export default function AccountLayout() {
       <Stack.Screen name="index" options={{ title: "My Account" }} />
       <Stack.Screen name="details" options={{ title: "Account Details" }} />
       <Stack.Screen name="dietary" options={{ title: "Allergies & Diets" }} />
-      <Stack.Screen name="log-in" options={{ title: "Log in" }} />
-      <Stack.Screen name="sign-up" options={{ title: "Create account" }} />
-      <Stack.Screen name="forgot-password" options={{ title: "Reset password" }} />
-      <Stack.Screen name="choose-username" options={{ title: "Choose a username" }} />
       <Stack.Screen name="change-password" options={{ title: "Change password" }} />
       <Stack.Screen name="delete-account" options={{ title: "Delete account" }} />
     </Stack>

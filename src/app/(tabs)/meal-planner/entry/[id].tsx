@@ -1,19 +1,18 @@
 // Edit one planned meal: change its servings, move it to another day or slot,
 // or remove it from the plan.
-import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { ChipSelect, formatOptionLabel } from "@/components/form/ChipSelect";
 import { FieldError } from "@/components/form/FormField";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { PlaceholderScreen } from "@/components/PlaceholderScreen";
+import { ServingsStepper } from "@/components/ServingsStepper";
 import { TextAction } from "@/components/TextAction";
-import { formatServings } from "@/features/meal-planner/components/DaySlots";
 import { WeekStrip } from "@/features/meal-planner/components/WeekStrip";
 import { formatDay, todayKey } from "@/features/meal-planner/dates";
 import { writeErrorMessage } from "@/features/meal-planner/writeErrorMessage";
 import { useRecipesById } from "@/features/recipes/useRecipes";
 import type { MealPlanEntry } from "@/repositories/MealPlanRepository";
 import { useMealPlanRepository } from "@/repositories/RepositoryProvider";
-import { borderWidth, colors, iconSize, MIN_TOUCH_TARGET, radius, spacing, typography } from "@/theme";
+import { colors, spacing, typography } from "@/theme";
 import {
   MAX_SERVINGS,
   mealPlanEntryIdSchema,
@@ -22,7 +21,7 @@ import {
 } from "@/validation/mealPlanSchema";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 // Shown when the meal doesn't exist, e.g. it was removed or the link was wrong.
 const NOT_FOUND = (
@@ -126,29 +125,15 @@ function EntryEditor({ entry }: { entry: MealPlanEntry }) {
       {/* Servings: − and + buttons around the number. Each button is disabled at
           the lowest or highest number allowed. */}
       <Text style={styles.sectionTitle}>Servings</Text>
-      <View style={styles.stepper}>
-        <Pressable
-          onPress={() => setServings((current) => Math.max(MIN_SERVINGS, current - 1))}
-          disabled={servings <= MIN_SERVINGS}
-          accessibilityRole="button"
-          accessibilityLabel="Fewer servings"
-          style={[styles.stepperButton, servings <= MIN_SERVINGS && styles.disabled]}
-        >
-          <DecorativeIcon name="remove" size={iconSize.lg} color={colors.action} />
-        </Pressable>
-        <Text style={styles.stepperValue} accessibilityLabel={formatServings(servings)}>
-          {servings}
-        </Text>
-        <Pressable
-          onPress={() => setServings((current) => Math.min(MAX_SERVINGS, current + 1))}
-          disabled={servings >= MAX_SERVINGS}
-          accessibilityRole="button"
-          accessibilityLabel="More servings"
-          style={[styles.stepperButton, servings >= MAX_SERVINGS && styles.disabled]}
-        >
-          <DecorativeIcon name="add" size={iconSize.lg} color={colors.action} />
-        </Pressable>
-      </View>
+      <ServingsStepper
+        value={servings}
+        onDecrease={() => setServings((current) => Math.max(MIN_SERVINGS, current - 1))}
+        onIncrease={() => setServings((current) => Math.min(MAX_SERVINGS, current + 1))}
+        canDecrease={servings > MIN_SERVINGS}
+        canIncrease={servings < MAX_SERVINGS}
+        decreaseLabel="Fewer servings"
+        increaseLabel="More servings"
+      />
 
       {/* Move to: pick a day from the week strip, then Breakfast, Lunch or Dinner.
           The line underneath shows where the meal will end up. */}
@@ -192,27 +177,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.sm,
   },
-  stepper: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
-  },
-  // Outlined green squares, like the servings buttons in the recipe mockup.
-  stepperButton: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.thick,
-    borderColor: colors.action,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepperValue: {
-    ...typography.number,
-    color: colors.text,
-    minWidth: MIN_TOUCH_TARGET,
-    textAlign: "center",
-  },
   spacer: {
     height: spacing.md,
   },
@@ -220,8 +184,5 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textMuted,
     marginTop: spacing.md,
-  },
-  disabled: {
-    opacity: 0.4,
   },
 });

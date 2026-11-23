@@ -1,26 +1,27 @@
 // Finish creating an account whose sign up stopped before the username was saved (N-13).
-// The uid always comes from the signed-in session, never from route params.
+// The auth gate shows this instead of the tabs until a username is saved
+// (src/features/account/gate/). The uid always comes from the signed-in session, never
+// from route params.
 import { issuesToFieldErrors, type FieldErrors } from "@/components/form/fieldErrors";
 import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { accountErrorMessage, accountFieldMessage, offlineMessage } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
 import { colors, spacing, typography } from "@/theme";
+import { LogOutButton } from "@/features/account/components/LogOutButton";
 import { UsernameField } from "@/features/account/components/UsernameField";
+import { useHoldAuthGate } from "@/features/account/gate/AuthGateProvider";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
-import { useAuthUser } from "@/features/account/useAuthUser";
 import { useOnline } from "@/features/account/useOnline";
 import { chooseUsernameSchema } from "@/validation/authSchema";
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 
-// Opened after logging in or signing up when the account has no username yet.
+// Shown after logging in or signing up when the account has no username yet.
 export default function ChooseUsernameScreen() {
-  const router = useRouter();
   const { signUp } = useAccountFlows();
-  // The signed-in user, or null if nobody is signed in.
-  const user = useAuthUser();
+  // Keeps this screen up until the username has been saved.
+  const holdWhile = useHoldAuthGate();
   // true or false once known, null while the first check is still running.
   const online = useOnline();
   const [username, setUsername] = useState("");
@@ -30,16 +31,6 @@ export default function ChooseUsernameScreen() {
   const [message, setMessage] = useState<string | null>(null);
   // True while saving, so the button can't be pressed twice.
   const [busy, setBusy] = useState(false);
-
-  // If the user isn't logged in, show a message and a button to log in. Otherwise, show the form.
-  if (!user) {
-    return (
-      <AccountFormScreen>
-        <FormMessage tone="info" message="Log in to finish creating your account." />
-        <SubmitButton label="Log in" onPress={() => router.replace("/account/log-in")} />
-      </AccountFormScreen>
-    );
-  }
 
   // Only true once we know the phone is offline. While the first check is still
   // running, the button stays enabled.
@@ -56,14 +47,11 @@ export default function ChooseUsernameScreen() {
     setErrors({});
     setBusy(true);
 
-    // If it worked, go back to the Account page. A taken username is shown under the
-    // username box; anything else is shown for the whole form.
-    const result = await signUp.chooseUsername(parsed.data);
-    if (result.ok) {
-      router.dismissTo("/account");
-      return;
-    }
+    // If it worked, the gate shows the tabs once the profile is on the phone. A taken
+    // username is shown under the username box; anything else is shown for the whole form.
+    const result = await holdWhile(() => signUp.chooseUsername(parsed.data));
     setBusy(false);
+    if (result.ok) return;
     if (result.error === "taken") {
       setErrors({ username: accountErrorMessage("taken", "choose_username") });
     } else {
@@ -82,6 +70,8 @@ export default function ChooseUsernameScreen() {
       <UsernameField value={username} onChangeText={setUsername} error={errors.username} editable={!busy} />
       {message ? <FormMessage tone="error" message={message} /> : null}
       <SubmitButton label="Save username" busyLabel="Saving…" busy={busy} disabled={offline} onPress={handleSave} />
+      {/* The tabs aren't available until there's a username, so this is the way out. */}
+      <LogOutButton />
     </AccountFormScreen>
   );
 }

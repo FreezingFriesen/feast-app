@@ -5,23 +5,23 @@ import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { accountErrorMessage, accountFieldMessage, offlineMessage } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
-import { AlreadySignedIn } from "@/features/account/components/AlreadySignedIn";
 import { TextAction } from "@/components/TextAction";
+import { useHoldAuthGate } from "@/features/account/gate/AuthGateProvider";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
-import { useAuthUser } from "@/features/account/useAuthUser";
 import { useOnline } from "@/features/account/useOnline";
 import { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, signInSchema } from "@/validation/authSchema";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 
-// The log in form. After logging in, it goes back to the Account page, or on to
-// choosing a username if this account's sign up never finished.
+// The log in form, opened from the welcome screen. After logging in, the auth gate
+// (src/features/account/gate/) replaces the welcome screens with the tabs, or with the
+// username step if this account's sign up never finished, so Back can't return here.
 export default function LogInScreen() {
   const router = useRouter();
   // The account actions (log in, sign up, ...). The screen never talks to Firebase directly.
   const { signIn } = useAccountFlows();
-  // The signed-in user, or null if nobody is signed in.
-  const user = useAuthUser();
+  // Keeps this screen up until the log in has finished (profile included).
+  const holdWhile = useHoldAuthGate();
   // true or false once known, null while the first check is still running.
   const online = useOnline();
   // What has been typed into each box.
@@ -32,9 +32,6 @@ export default function LogInScreen() {
   const [message, setMessage] = useState<string | null>(null);
   // True while logging in. The boxes and buttons are locked until it finishes.
   const [busy, setBusy] = useState(false);
-
-  // While busy the user appears as soon as the log in succeeds; don't flash this then.
-  if (user && !busy) return <AlreadySignedIn />;
 
   // Only true once we know the phone is offline. While the first check is still
   // running, the button stays enabled.
@@ -52,20 +49,14 @@ export default function LogInScreen() {
     setErrors({});
     setBusy(true);
 
-    // If it worked, go back to the Account page (or on to choosing a username).
-    // replace() swaps this screen for the next one, so Back doesn't return to the log in form.
-    const result = await signIn.signIn(parsed.data);
-    if (result.status === "signed_in") {
-      if (result.profile === "needs_username") {
-        router.replace("/account/choose-username");
-      } else {
-        router.dismissTo("/account");
-      }
-      return;
-    }
-    // It didn't work: unlock the form, clear the password, and show why.
+    // If it worked, the gate moves on by itself once the hold ends. The form is
+    // unlocked and the password cleared either way, in case this screen is still
+    // showing (e.g. the session check failed).
+    const result = await holdWhile(() => signIn.signIn(parsed.data));
     setBusy(false);
     setValues((current) => ({ ...current, password: "" }));
+    if (result.status === "signed_in") return;
+    // It didn't work: show why.
     setMessage(accountErrorMessage(result.error, "log_in"));
   }
 
@@ -110,11 +101,11 @@ export default function LogInScreen() {
       {message ? <FormMessage tone="error" message={message} /> : null}
       <SubmitButton label="Log in" busyLabel="Logging in…" busy={busy} disabled={offline} onPress={handleLogIn} />
       {/* Links to the other signed-out screens. */}
-      <TextAction label="Forgot password?" disabled={busy} onPress={() => router.push("/account/forgot-password")} />
+      <TextAction label="Forgot password?" disabled={busy} onPress={() => router.push("/forgot-password")} />
       <TextAction
         label="New here? Create an account"
         disabled={busy}
-        onPress={() => router.replace("/account/sign-up")}
+        onPress={() => router.replace("/sign-up")}
       />
     </AccountFormScreen>
   );

@@ -40,15 +40,9 @@ export default function ChangePasswordScreen() {
   // True while changing the password, so the button can't be pressed twice.
   const [busy, setBusy] = useState(false);
 
-  // Nobody is signed in (e.g. the session ran out): ask them to log in first.
-  if (!user) {
-    return (
-      <AccountFormScreen>
-        <FormMessage tone="info" message="Log in to change your password." />
-        <SubmitButton label="Log in" onPress={() => router.replace("/account/log-in")} />
-      </AccountFormScreen>
-    );
-  }
+  // The auth gate only shows the tabs to a signed-in user, so this is only the moment
+  // between logging out and the welcome screen replacing the tabs.
+  if (!user) return null;
 
   // After changing it: a success message and a button back to the Account page.
   if (changed) {

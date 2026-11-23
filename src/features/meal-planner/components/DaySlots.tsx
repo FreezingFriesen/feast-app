@@ -1,5 +1,6 @@
 import { DecorativeIcon } from "@/components/DecorativeIcon";
 import { formatOptionLabel } from "@/components/form/ChipSelect";
+import { formatServings } from "@/features/recipes/formatServings";
 import { formatMinutes, totalMinutes } from "@/features/recipes/recipeTime";
 import type { MealPlanEntry } from "@/repositories/MealPlanRepository";
 import type { Recipe } from "@/repositories/RecipeRepository";
@@ -20,10 +21,8 @@ type DaySlotsProps = {
   onPressEntry: (entry: MealPlanEntry) => void;
 };
 
-// "1 serving" or "4 servings".
-export function formatServings(servings: number): string {
-  return servings === 1 ? "1 serving" : `${servings} servings`;
-}
+// "1 serving" or "4 servings" (kept here too for the planner screens that import it).
+export { formatServings } from "@/features/recipes/formatServings";
 
 // The Breakfast, Lunch and Dinner slots for one day. Used by the week view and the day popup.
 // As in the mockup: a heading per slot, then a card per planned meal.

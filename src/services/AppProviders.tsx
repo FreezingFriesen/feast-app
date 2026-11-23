@@ -1,4 +1,5 @@
 import { PlaceholderScreen } from "@/components/PlaceholderScreen";
+import { AuthGateProvider } from "@/features/account/gate/AuthGateProvider";
 import { SessionStatusProvider } from "@/features/account/SessionStatusProvider";
 import { RepositoryProvider } from "@/repositories/RepositoryProvider";
 import { openAppDatabase } from "@/storage/expoSqliteDatabase";
@@ -64,18 +65,19 @@ export function AppProviders({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // The splash screen (held in src/app/_layout.tsx) covers startup. Hide it when
-  // startup has worked or failed, so the first screen or the error shows, and in any
-  // case after SPLASH_TIMEOUT_MS.
-  const starting = startup.status === "loading";
+  // The splash screen (held in src/app/_layout.tsx) covers startup. If startup worked,
+  // the auth gate hides it once it knows which screen to show (AuthGateProvider). Here
+  // it's hidden when startup failed, so the error shows, and in any case after
+  // SPLASH_TIMEOUT_MS.
+  const failed = startup.status === "failed";
   useEffect(() => {
-    if (!starting) {
+    if (failed) {
       SplashScreen.hide();
       return;
     }
     const timer = setTimeout(() => SplashScreen.hide(), SPLASH_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [starting]);
+  }, [failed]);
 
   // Once started, sync recipes and meal plans in the foreground (N-19): straight away if a
   // saved login was restored, and on sign in, reconnecting and local changes after that.
@@ -108,12 +110,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
     );
   }
 
-  // Ready: share the repositories and services with every screen, and start the
-  // 30-day session check.
+  // Ready: share the repositories and services with every screen, start the 30-day
+  // session check, and let the auth gate decide which screens are available.
   return (
     <RepositoryProvider repositories={startup.app.repositories}>
       <ServiceProvider services={startup.app.services}>
-        <SessionStatusProvider>{children}</SessionStatusProvider>
+        <SessionStatusProvider>
+          <AuthGateProvider>{children}</AuthGateProvider>
+        </SessionStatusProvider>
       </ServiceProvider>
     </RepositoryProvider>
   );

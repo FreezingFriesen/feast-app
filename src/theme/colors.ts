@@ -136,4 +136,9 @@ export const contrastPairs: readonly ContrastPair[] = Object.freeze([
   { use: "Meal marker outline on a selected day", foreground: mealTypeColors.outline, background: colors.selectedTint, kind: "ui" },
   { use: "Welcome text on orange", foreground: colors.onWelcome, background: brand.orange, kind: "text" },
   { use: "Welcome text on the fallback colour", foreground: colors.onWelcome, background: colors.welcomeFallback, kind: "text" },
+  { use: "Welcome divider lines (\"or continue with\")", foreground: colors.onWelcome, background: colors.welcomeFallback, kind: "ui" },
+  { use: "Social button label and logo (white button)", foreground: colors.text, background: colors.surface, kind: "text" },
+  { use: "Recipe stat values (green on the cream stat strip)", foreground: colors.action, background: colors.chrome, kind: "text" },
+  { use: "Servings stepper edge and icons", foreground: colors.action, background: colors.background, kind: "ui" },
+  { use: "Recipe menu edge (\"•••\")", foreground: colors.inputBorder, background: colors.surface, kind: "ui" },
 ]);

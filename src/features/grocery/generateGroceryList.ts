@@ -3,6 +3,7 @@
 // units combined only when that is safe (N-08). Worked out from the meal plan every time,
 // never stored. Pure: no React, no storage, no network.
 import { findCheckedMatch } from "@/repositories/checkedCatalogMatch";
+import { scaleQuantity } from "@/features/recipes/scaleQuantity";
 import type { CatalogMatch, IngredientCatalog } from "@/repositories/IngredientCatalog";
 import type { MealPlanEntry } from "@/repositories/MealPlanRepository";
 import type { Recipe } from "@/repositories/RecipeRepository";
@@ -137,8 +138,8 @@ export function generateGroceryList({ entries, recipesById, catalog }: GroceryLi
       continue;
     }
     for (const row of recipe.ingredients) {
-      // Multiply before dividing, and never round: rounding happens only for display.
-      const amount = (row.quantity * entry.servings) / recipe.servings;
+      // Scaled to the planned servings (N-09), never rounded: rounding happens only for display.
+      const amount = scaleQuantity(row.quantity, recipe.servings, entry.servings);
       // Checked like any data from outside the app (findCheckedMatch): a match that fails
       // the check is ignored, so a bad density can never produce a wrong amount.
       const match = findCheckedMatch(catalog, row);

@@ -3,6 +3,8 @@ import { SubmitButton } from "@/components/form/SubmitButton";
 import { useState } from "react";
 import { Alert } from "react-native";
 import { accountErrorMessage } from "../accountMessages";
+import { useWelcomeNotice } from "../gate/AuthGateProvider";
+import { LOG_OUT_WIPE_FAILED_MESSAGE } from "../gate/welcomeNotice";
 import { logOutPrompt, type LogOutChoice } from "../logOutPrompt";
 import { useAccountFlows } from "../useAccountFlows";
 import { useOnline } from "../useOnline";
@@ -12,6 +14,8 @@ import { useSyncStatus } from "../useSyncStatus";
 // backed up, and offers to sync first. Logging out itself works offline.
 export function LogOutButton() {
   const { logOut } = useAccountFlows();
+  // For a message the welcome screen shows after the tabs have gone.
+  const { showNotice } = useWelcomeNotice();
   // How many changes are waiting to sync, and whether sync is working at all.
   const status = useSyncStatus();
   const online = useOnline();
@@ -26,12 +30,14 @@ export function LogOutButton() {
     setError(null);
     try {
       const result = await logOut.logOut({ syncFirst: choice === "sync_then_log_out" });
-      if (!result.ok) {
-        setError(
-          result.error === "sync_failed"
-            ? accountErrorMessage("sync_failed", "log_in")
-            : "You're logged out, but some data couldn't be removed from this phone.",
-        );
+      if (!result.ok && result.error === "sync_failed") {
+        setError(accountErrorMessage("sync_failed", "log_in"));
+      } else if (!result.ok) {
+        // Usually the user is already signed out and the gate shows the welcome screen,
+        // so the message (with "Try again") is shown there. If signing out itself failed,
+        // they're still in the app: the gate drops the notice and this message shows.
+        setError(LOG_OUT_WIPE_FAILED_MESSAGE);
+        showNotice("log_out_wipe_failed");
       }
     } finally {
       setBusy(false);

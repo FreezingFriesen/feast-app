@@ -61,6 +61,8 @@ const FILTER_MODULES = [
   "features/recipes/filter/recipeSort.ts",
   "testing/recipeFilterTestBed.ts",
   "features/meal-planner/pickRecipeSections.ts",
+  "features/recipes/detail/recipeDetailView.ts",
+  "features/recipes/scaleQuantity.ts",
 ];
 
 describe("the recipe filter modules are plain TypeScript", () => {

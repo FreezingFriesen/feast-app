@@ -47,7 +47,11 @@ export function inVocabularyOrder<T extends string>(vocabulary: readonly T[]) {
   return (values: T[]): T[] => vocabulary.filter((value) => values.includes(value));
 }
 
-// A recipe's ID, e.g. from the link that opens the edit screen. Route params can come
+// How many servings a recipe makes, and the range the recipe detail screen's − / +
+// stepper may show (#8).
+export const recipeServingsSchema = z.number().int().min(1).max(100);
+
+// A recipe's ID, e.g. from the link that opens the detail or edit screen. Route params can come
 // from a deep link, so they are checked like any other user input.
 export const recipeIdSchema = z.string().max(100).regex(ID_PATTERN);
 
@@ -64,7 +68,7 @@ export const ingredientRowSchema = z.object({
 export const recipeSchema = z.object({
   title: safeName(100),
   description: safeText(0, 500).optional(),
-  servings: z.number().int().min(1).max(100),
+  servings: recipeServingsSchema,
   prepTimeMinutes: z.number().int().min(0).max(1440).optional(),
   cookTimeMinutes: z.number().int().min(0).max(1440).optional(),
   mealTypes: z.array(z.enum(MEAL_TYPES)).max(4).transform(inVocabularyOrder(MEAL_TYPES)).default([]),

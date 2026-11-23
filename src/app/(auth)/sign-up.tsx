@@ -5,11 +5,10 @@ import { FormMessage } from "@/components/form/FormMessage";
 import { SubmitButton } from "@/components/form/SubmitButton";
 import { accountErrorMessage, accountFieldMessage, offlineMessage } from "@/features/account/accountMessages";
 import { AccountFormScreen } from "@/features/account/components/AccountFormScreen";
-import { AlreadySignedIn } from "@/features/account/components/AlreadySignedIn";
 import { TextAction } from "@/components/TextAction";
 import { UsernameField } from "@/features/account/components/UsernameField";
+import { useHoldAuthGate } from "@/features/account/gate/AuthGateProvider";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
-import { useAuthUser } from "@/features/account/useAuthUser";
 import { useOnline } from "@/features/account/useOnline";
 import {
   MAX_EMAIL_LENGTH,
@@ -26,13 +25,16 @@ const PASSWORD_RULES = `minlength: ${MIN_PASSWORD_LENGTH}; maxlength: ${MAX_PASS
 // What has been typed into each box.
 type SignUpValues = { email: string; username: string; password: string; confirmPassword: string };
 
-// The sign up form. After the account is created, it goes back to the Account page.
+// The sign up form, opened from the welcome screen. After the account is created, the
+// auth gate (src/features/account/gate/) replaces the welcome screens with the tabs, or
+// with the username step if the username couldn't be saved, so Back can't return here.
 export default function SignUpScreen() {
   const router = useRouter();
   // The account actions. The screen never talks to Firebase directly.
   const { signUp } = useAccountFlows();
-  // The signed-in user, or null if nobody is signed in.
-  const user = useAuthUser();
+  // Keeps this screen up until sign up has finished. The user appears part way through,
+  // before the username is saved, and the username step mustn't flash in between.
+  const holdWhile = useHoldAuthGate();
   // true or false once known, null while the first check is still running.
   const online = useOnline();
   const [values, setValues] = useState<SignUpValues>({ email: "", username: "", password: "", confirmPassword: "" });
@@ -42,9 +44,6 @@ export default function SignUpScreen() {
   const [message, setMessage] = useState<string | null>(null);
   // True while the account is being created. The boxes and buttons are locked until it finishes.
   const [busy, setBusy] = useState(false);
-
-  // While busy the user appears part way through sign up; don't flash this then.
-  if (user && !busy) return <AlreadySignedIn />;
 
   // Only true once we know the phone is offline. While the first check is still
   // running, the button stays enabled.
@@ -69,20 +68,13 @@ export default function SignUpScreen() {
 
     // The flow needs the confirmation too, so it gets the form values and stores only
     // what its own parse returns.
-    const result = await signUp.signUp(values);
-    // Everything worked: back to the Account page.
-    if (result.status === "signed_up") {
-      router.dismissTo("/account");
-      return;
-    }
-    // The account was created but the username couldn't be saved, so ask for one.
-    if (result.status === "needs_username") {
-      router.replace("/account/choose-username");
-      return;
-    }
+    const result = await holdWhile(() => signUp.signUp(values));
+    setBusy(false);
+    // The account was created (with or without its username): the gate moves on to
+    // the tabs or the username step by itself once the hold ends.
+    if (result.status === "signed_up" || result.status === "needs_username") return;
     // It didn't work. A taken username is shown under the username box; anything
     // else is shown for the whole form.
-    setBusy(false);
     if (result.error === "taken") {
       setErrors({ username: accountErrorMessage("taken", "sign_up") });
     } else {
@@ -161,7 +153,7 @@ export default function SignUpScreen() {
       <TextAction
         label="Already have an account? Log in"
         disabled={busy}
-        onPress={() => router.replace("/account/log-in")}
+        onPress={() => router.replace("/log-in")}
       />
     </AccountFormScreen>
   );

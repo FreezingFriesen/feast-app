@@ -14,25 +14,27 @@ import {
   deletionItems,
   type DeletionFailureView,
 } from "@/features/account/deleteAccountMessages";
+import { useWelcomeNotice } from "@/features/account/gate/AuthGateProvider";
 import { useAccountFlows } from "@/features/account/useAccountFlows";
 import { useAccountProfile } from "@/features/account/useAccountProfile";
 import { useOnline } from "@/features/account/useOnline";
-import { useLocalDataWiper } from "@/services/ServiceProvider";
 import { MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, reauthSchema } from "@/validation/authSchema";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 
-// Where the user is: "verify" (enter password), "confirm" (type username) or "done".
-type Step = "verify" | "confirm" | "done";
+// Where the user is: "verify" (enter password) or "confirm" (type username).
+type Step = "verify" | "confirm";
 
 // Opened from the signed-in Account page. Every deletion step is safe to repeat,
 // so if it stops part way, "Try again" runs it again and finishes the job.
+// Once the auth account is deleted nobody is signed in, so the auth gate replaces the
+// tabs with the welcome screen while the phone is cleared. The result ("deleted", or
+// "couldn't clear this phone" with "Try again") is shown there.
 export default function DeleteAccountScreen() {
   const router = useRouter();
   const { security, deleteAccount } = useAccountFlows();
-  // Clears everything Feast has saved on this phone.
-  const localData = useLocalDataWiper();
+  const { showNotice } = useWelcomeNotice();
   // The signed-in user and their profile (for the username).
   const account = useAccountProfile();
   // true or false once known, null while the first check is still running.
@@ -56,47 +58,13 @@ export default function DeleteAccountScreen() {
   // running, the buttons stay enabled.
   const offline = online === false;
 
-  // Finished: the account is gone. "Done" goes back to the Account page.
-  if (step === "done") {
-    return (
-      <AccountFormScreen>
-        <FormMessage tone="success" message="Your account has been deleted." />
-        <SubmitButton label="Done" onPress={() => router.dismissTo("/account")} />
-      </AccountFormScreen>
-    );
-  }
-
-  // The account is gone; only clearing this phone is left.
-  if (failure?.retry === "wipe_local") {
-    const retryWipe = async () => {
-      setBusy(true);
-      try {
-        await localData.wipe();
-        setStep("done");
-      } catch {
-        setMessage("That didn't work either. Try again in a moment.");
-      } finally {
-        setBusy(false);
-      }
-    };
-
-    // Explain what went wrong, with a button to try clearing the phone again.
-    return (
-      <AccountFormScreen>
-        <FormMessage tone="error" message={failure.message} />
-        {message ? <FormMessage tone="error" message={message} /> : null}
-        <SubmitButton label="Try again" busyLabel="Removing…" busy={busy} onPress={retryWipe} />
-      </AccountFormScreen>
-    );
-  }
-
-  // Nobody is signed in, or the profile isn't ready, so there's nothing to delete.
-  // Not shown while busy: the profile disappears from the phone during the deletion,
-  // and this message shouldn't replace the screen part way through.
+  // The profile isn't ready (still loading, or not on this phone), so the username to
+  // confirm isn't known yet. Not shown while busy: the profile disappears from the phone
+  // during the deletion, and this message shouldn't replace the screen part way through.
   if (account.status !== "ready" && !busy) {
     return (
       <AccountFormScreen>
-        <FormMessage tone="info" message="Log in to delete your account." />
+        <FormMessage tone="info" message="Your account isn't ready on this phone yet." />
         <SubmitButton label="Back to account" onPress={() => router.dismissTo("/account")} />
       </AccountFormScreen>
     );
@@ -140,13 +108,18 @@ export default function DeleteAccountScreen() {
       const result = await deleteAccount.deleteAccount({ password, confirmation });
       if (result.ok) {
         setPassword("");
-        setStep("done");
+        showNotice("account_deleted");
         return;
       }
       // It didn't work. Depending on why: go back to step 1 for a wrong password,
       // mark the username box if it doesn't match, or show the error with "Try again".
       const view = deletionFailureView(result);
-      if (view.field === "password") {
+      if (view.retry === "wipe_local") {
+        // The account is gone and only clearing this phone is left. The welcome screen
+        // is showing by now; it offers "Try again".
+        setPassword("");
+        showNotice("delete_wipe_failed");
+      } else if (view.field === "password") {
         setPassword("");
         setStep("verify");
         setErrors({ password: view.message });

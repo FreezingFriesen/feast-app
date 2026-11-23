@@ -75,12 +75,12 @@ export default function RecipesScreen() {
             />
           }
           // Each recipe with its servings and number of ingredients, any allergen or diet
-          // notes, and an edit button. Only the button opens the editor: tapping the row
-          // itself is kept for the recipe detail screen (not built yet), so a stray tap
-          // can't start an edit.
+          // notes, and an edit button. Tapping the row opens the recipe (read-only, N-01);
+          // only the button opens the editor, so a stray tap can't start an edit.
           renderItem={({ item }) => (
             <RecipeRow
               row={item}
+              onOpen={() => router.push({ pathname: "/recipes/[id]", params: { id: item.recipe.id } })}
               onEdit={() => router.push({ pathname: "/recipes/edit/[id]", params: { id: item.recipe.id } })}
             />
           )}
@@ -90,17 +90,27 @@ export default function RecipesScreen() {
   );
 }
 
-function RecipeRow({ row, onEdit }: { row: RecipeRowView; onEdit: () => void }) {
+type RecipeRowProps = { row: RecipeRowView; onOpen: () => void; onEdit: () => void };
+
+function RecipeRow({ row, onOpen, onEdit }: RecipeRowProps) {
   const { recipe } = row;
+  // The text side and the edit button are separate touch targets side by side (never
+  // one inside the other), so a screen reader reaches both. The text side is read as
+  // one button: the title, the meta line and any notes.
   return (
     <View style={styles.item}>
-      <View style={styles.itemText}>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityHint="Opens the recipe"
+        style={({ pressed }) => [styles.itemText, pressed && styles.itemPressed]}
+      >
         <Text style={styles.itemTitle}>{recipe.title}</Text>
         <Text style={styles.itemMeta}>
           {recipe.servings} servings · {recipe.ingredients.length} ingredients
         </Text>
         <RecipeRowNotes notes={row.notes} />
-      </View>
+      </Pressable>
       <Pressable
         onPress={onEdit}
         accessibilityRole="button"
@@ -174,8 +184,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   // Takes the room the edit button doesn't, so long titles wrap instead of pushing it off.
+  // At least 44pt tall, so even a one-line row is an easy target.
   itemText: {
     flex: 1,
+    minHeight: MIN_TOUCH_TARGET,
+    justifyContent: "center",
+  },
+  itemPressed: {
+    opacity: 0.6,
   },
   itemTitle: {
     ...typography.itemTitle,
