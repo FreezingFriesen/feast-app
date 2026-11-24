@@ -21,8 +21,8 @@ import { createInMemoryRemoteProfileStore } from "./profiles/inMemoryRemoteProfi
 import type { RemoteProfileStore } from "./profiles/RemoteProfileStore";
 import type { Services } from "./ServiceProvider";
 import type { ChunkedSecureStorage } from "./session/chunkedSecureStorage";
-import { createSecureSessionStore } from "./session/SecureSessionStore";
 import type { SecureKeyValueStore } from "./session/secureKeyValue";
+import { createSecureSessionStore } from "./session/SecureSessionStore";
 import { createSessionGuard } from "./session/sessionGuard";
 import { createSessionPolicy } from "./session/SessionPolicy";
 import { createSyncService, type SyncEngine } from "./sync/createSyncService";
@@ -93,8 +93,7 @@ type RemoteOptions = {
   latencyMs: number;
 };
 
-// Builds the server-side services for the chosen backend: the real Firebase ones, or
-// fakes that share one pretend server.
+// Builds the server-side services for the backend
 function createRemote({ backend, authStorage, connectivity, now, latencyMs }: RemoteOptions): Remote {
   if (backend === "firebase") {
     // Loaded here, not at the top of this file, so with "memory" the Firebase SDK never
