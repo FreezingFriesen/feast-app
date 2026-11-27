@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/form/SubmitButton";
 import { TextAction } from "@/components/TextAction";
 import type { ManualGroceryItemData } from "@/repositories/GroceryRepository";
 import { colors, spacing, typography } from "@/theme";
-import { MAX_GROCERY_NAME_LENGTH, manualGroceryItemSchema } from "@/validation/groceryItemSchema";
+import { manualGroceryItemSchema, MAX_GROCERY_NAME_LENGTH } from "@/validation/groceryItemSchema";
 import { UNITS } from "@/validation/recipeSchema";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -96,7 +96,7 @@ export function AddGroceryItemForm({ onAdd }: AddGroceryItemFormProps) {
         value={values.name}
         onChangeText={(text) => setField("name", text)}
         maxLength={MAX_GROCERY_NAME_LENGTH}
-        placeholder="e.g. Paper towels"
+        placeholder="e.g. pancake mix"
         error={errors.name}
       />
       <FormField
